@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>数据真实性审计 · 球员挖掘系统</title>
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+<div id="nav"></div>
+
+<section class="wrap section">
+  <div class="eyebrow">数据可信度</div>
+  <h1>数据真实性审计</h1>
+  <p class="lede">
+    这一页回答一个问题：<b>页面上每一个数字，到底是真实抓到的，还是算出来的，还是根本没有？</b>
+    所有比例均由本地真实库存量计算得出，不含任何估算。
+  </p>
+</section>
+
+<section class="wrap section tight">
+  <div class="grid g4" id="kpis"></div>
+</section>
+
+<section class="wrap section tight">
+  <div class="grid g2">
+    <div class="card">
+      <h3>球员档案完整度分布</h3>
+      <p class="small muted mt8">按五项关键字段（姓名 / 位置 / 年龄 / 球队 / 联赛）的齐全比例分档统计。</p>
+      <div class="donut mt16" id="donut"></div>
+    </div>
+    <div class="card">
+      <h3>四类数据来源占比</h3>
+      <p class="small muted mt8">系统对字段做了严格分类，界面上会以不同颜色标记。</p>
+      <div class="cov mt16" id="kindCov"></div>
+      <div class="note gray mt16" style="font-size:12.5px">
+        <b>真实</b>：外部数据源直接返回 ·
+        <b>推导</b>：由真实字段按公开规则算出 ·
+        <b>模型</b>：基于战术常识的估算 ·
+        <b>无源</b>：无任何开放数据源，一律留空
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="wrap section tight">
+  <div class="card">
+    <div class="between">
+      <h3>逐字段真实覆盖率</h3>
+      <span class="small muted" id="covSample"></span>
+    </div>
+    <p class="small muted mt8">每一条都标明了数据出处与缺失原因。灰色条表示该字段当前<b>永远拿不到</b>，系统不会用推测值填充。</p>
+    <div class="cov mt16" id="fieldCov"></div>
+  </div>
+</section>
+
+<section class="wrap section tight">
+  <div class="card">
+    <div class="between mb8">
+      <h3>数据源运行状态</h3>
+      <button class="btn sm" id="refreshNow">立即回源刷新</button>
+    </div>
+    <div class="small muted mt8" id="refreshTip"></div>
+    <div class="grid g2 mt16" id="sourceState"></div>
+  </div>
+</section>
+
+<section class="wrap section tight">
+  <div class="card">
+    <div class="between mb8">
+      <h3>实时联网状态</h3>
+      <button class="btn sm" id="probeBtn">测试实时连通性</button>
+    </div>
+    <p class="small muted">系统已支持<b>按需实时联网取数</b>：检索球员、查看档案、载入球队时直接向数据源发起请求，
+      返回的就是数据源当前值，不使用本地缓存副本。下方统计真实联网次数与最近请求。</p>
+    <div class="grid g4 mt16" id="liveKpis"></div>
+    <div class="small muted mt16" id="probeTip"></div>
+    <div class="tbl-scroll mt16">
+      <table class="table">
+        <thead><tr><th>时间</th><th>取数方式</th><th>对象</th></tr></thead>
+        <tbody id="liveRecent"></tbody>
+      </table>
+    </div>
+    <div class="note gray mt16" style="font-size:12.5px">
+      <b>实时联网</b>：本次请求直接命中数据源 ·
+      <b>上次真实数据</b>：联网失败（限流/超时）后回退到最近一次联网成功的真实值，并标注获取时间 ·
+      两种情况都不会产生任何估算或虚构数值。
+    </div>
+  </div>
+</section>
+
+<section class="wrap section tight">
+  <div class="card">
+    <h3>拿不到的数据 · 以及系统怎么处理</h3>
+    <p class="small muted mt8">这些是足球数据行业公认的封闭数据。本系统选择明确留空，而不是编造一个看起来像真的数字。</p>
+    <div class="tbl-scroll mt16">
+      <table class="table">
+        <thead><tr><th>数据项</th><th>拿不到的原因</th><th>系统处理策略</th></tr></thead>
+        <tbody id="unavail"></tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section class="wrap section tight">
+  <div class="card">
+    <h3>单球员溯源查询</h3>
+    <p class="small muted mt8">输入球员名，查看他每一个字段的来源、数值与可交叉核对的外部链接。</p>
+    <div class="row mt16">
+      <input type="search" id="pq" placeholder="例如：Messi / Son / 张玉宁" style="max-width:320px">
+      <button class="btn" id="pbtn">查询并溯源</button>
+      <span class="small muted" id="ptip"></span>
+    </div>
+    <div class="mt16" id="provBox"></div>
+  </div>
+</section>
+
+<section class="wrap section tight">
+  <div class="card">
+    <h3>数据原则</h3>
+    <div id="principles" class="mt8"></div>
+  </div>
+</section>
+
+<div id="foot"></div>
+<script src="assets/js/common.js"></script>
+<script>
+renderNav('truth.html');
+
+const KIND_CN = { real: '真实', derived: '推导', model: '模型', none: '无源' };
+
+(async function () {
+  let rep;
+  try { rep = (await api.get('/api/truth')).report; }
+  catch (e) {
+    document.getElementById('kpis').innerHTML = '<div class="card">数据服务未响应，请确认服务已启动</div>';
+    return;
+  }
+
+  /* ---- KPI ---- */
+  document.getElementById('kpis').innerHTML = [
+    ['在库真实球员', rep.sampleSize + ' 人', ''],
+    ['真实字段平均覆盖率', rep.avgRealCoverage + '%', rep.avgRealCoverage >= 70 ? 'ok' : rep.avgRealCoverage >= 50 ? 'warn' : 'err'],
+    ['关键字段齐全率', rep.keyFieldComplete + '%', rep.keyFieldComplete >= 70 ? 'ok' : 'warn'],
+    ['可交叉核对比例', rep.crossCheckable + '%', '']
+  ].map(([l, v, c]) => `<div class="card">
+      <div class="card-title">${l}</div>
+      <div class="metric">${v}</div>
+      ${c ? `<div class="mt8"><span class="badge ${c}">${c === 'ok' ? '良好' : c === 'warn' ? '一般' : '偏低'}</span></div>` : ''}
+    </div>`).join('');
+
+  /* ---- 环形图 ---- */
+  const d = rep.distribution, tot = d['高'] + d['中'] + d['低'] || 1;
+  const seg = [['高', d['高'], '#248a3d'], ['中', d['中'], '#c2700b'], ['低', d['低'], '#d70015']];
+  let off = 0, R = 54, C = 2 * Math.PI * R;
+  const arcs = seg.map(([n, v, color]) => {
+    const len = v / tot * C;
+    const s = `<circle cx="70" cy="70" r="${R}" fill="none" stroke="${color}" stroke-width="22"
+      stroke-dasharray="${len} ${C - len}" stroke-dashoffset="${-off}" transform="rotate(-90 70 70)"/>`;
+    off += len; return s;
+  }).join('');
+  document.getElementById('donut').innerHTML = `
+    <svg width="140" height="140" viewBox="0 0 140 140">
+      <circle cx="70" cy="70" r="${R}" fill="none" stroke="#ececf1" stroke-width="22"/>
+      ${arcs}
+      <text x="70" y="66" text-anchor="middle" font-size="24" font-weight="600" fill="#1d1d1f">${rep.keyFieldComplete}%</text>
+      <text x="70" y="86" text-anchor="middle" font-size="11" fill="#6e6e73">关键字段齐全</text>
+    </svg>
+    <div class="donut-legend">
+      ${seg.map(([n, v, c]) => `<div class="mt8"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${c};margin-right:6px"></span>
+        ${n}完整度 <b>${v}</b> 人（${(v / tot * 100).toFixed(1)}%）</div>`).join('')}
+    </div>`;
+
+  /* ---- 四类来源占比 ---- */
+  document.getElementById('kindCov').innerHTML = rep.byKind.map(k => {
+    const pct = k.total ? +(k.filled / k.total * 100).toFixed(1) : 0;
+    const cls = k.kind === 'none' ? 'none' : (pct >= 70 ? '' : pct >= 40 ? 'mid' : 'low');
+    return `<div class="cov-row">
+      <span class="lb">${KIND_CN[k.kind] || k.kind}（${k.fields} 项）</span>
+      <span class="cov-track"><i class="${cls}" style="width:${pct}%"></i></span>
+      <span class="pc">${k.kind === 'none' ? '无源' : pct + '%'}</span>
+    </div>`;
+  }).join('');
+
+  /* ---- 逐字段覆盖率 ---- */
+  document.getElementById('covSample').textContent = '样本量：' + rep.sampleSize + ' 名真实球员';
+  document.getElementById('fieldCov').innerHTML = rep.fields.map(f => {
+    const cls = f.kind === 'none' ? 'none' : (f.pct >= 70 ? '' : f.pct >= 40 ? 'mid' : 'low');
+    const kind = `<span class="kind ${f.kind}">${KIND_CN[f.kind]}</span>`;
+    return `<div class="cov-row" title="${esc(f.note)}">
+      <span class="lb">${esc(f.label)} ${kind}</span>
+      <span class="cov-track"><i class="${cls}" style="width:${f.pct}%"></i></span>
+      <span class="pc">${f.kind === 'none' ? '—' : f.pct + '%'}</span>
+    </div>`;
+  }).join('');
+
+  /* ---- 数据源状态 ---- */
+  const s = rep.source, c = s.cache;
+  document.getElementById('sourceState').innerHTML = `
+    <div class="card flat">
+      <div class="card-title">主数据源</div>
+      <div style="font-weight:600;font-size:16px">${esc(s.primary.name)}</div>
+      <div class="small muted mt8">端点：${esc(s.primary.endpoint)}</div>
+      <div class="small muted">鉴权：${esc(s.primary.auth)}</div>
+      <div class="small muted mt8">提供：${s.primary.provides.map(esc).join(' · ')}</div>
+      <div class="small muted mt8">限制：${esc(s.primary.limitation)}</div>
+    </div>
+    <div class="card flat">
+      <div class="card-title">本地缓存（保证实时性同时避免限流）</div>
+      <div class="grid g2 mt8" style="gap:8px">
+        <div><div class="metric sm">${c.entries}</div><div class="small muted">缓存条目</div></div>
+        <div><div class="metric sm">${c.sizeKb} KB</div><div class="small muted">占用空间</div></div>
+      </div>
+      <div class="small muted mt8">最新：${esc((c.newestAt || '—').replace('T', ' ').slice(0, 19))}</div>
+      <div class="small muted">最早：${esc((c.oldestAt || '—').replace('T', ' ').slice(0, 19))}</div>
+      <div class="small muted mt8">刷新周期：${Object.keys(s.ttl).map(k => esc(k) + ' ' + esc(s.ttl[k])).join(' · ')}</div>
+    </div>`;
+
+  /* ---- 不可用数据源 ---- */
+  document.getElementById('unavail').innerHTML = s.unavailable.map(u => `<tr>
+      <td><b>${esc(u.name)}</b></td>
+      <td class="small muted">${esc(u.reason)}</td>
+      <td>${esc(u.policy)}</td>
+    </tr>`).join('');
+
+  /* ---- 原则 ---- */
+  document.getElementById('principles').innerHTML =
+    rep.principle.map(p => `<div class="note gray mt8">${esc(p)}</div>`).join('');
+})();
+
+/* ---------- 每日实时更新 ---------- */
+(async function loadRefresh() {
+  try {
+    const r = await api.get('/api/refresh/status');
+    document.getElementById('refreshTip').innerHTML =
+      `每日自动回源刷新（${r.intervalHours} 小时一轮，每轮 ${r.batchSize} 支球队）：
+       上次运行 <b>${esc((r.lastRun || '从未').replace('T', ' ').slice(0, 19))}</b>
+       · 下次运行 <b>${esc((r.nextRun || '待定').replace('T', ' ').slice(0, 19))}</b>
+       · 已刷新球队 <b>${r.refreshedTeams}</b> 支`;
+  } catch (e) { }
+})();
+/* ---------- 实时联网状态 ---------- */
+const MODE_CN = { live: '实时联网', cached: '上次真实数据', offline: '无数据', failed: '失败' };
+(async function loadLiveStatus() {
+  try {
+    const r = await api.get('/api/live/status');
+    const x = r.status || {};
+    document.getElementById('liveKpis').innerHTML = [
+      ['实时联网取数次数', (x.live || 0) + ' 次', ''],
+      ['最近一次联网', x.lastLiveAt ? new Date(x.lastLiveAt).toLocaleString('zh-CN') : '尚未发生', ''],
+      ['回退到上次真实数据', (x.cached || 0) + ' 次', 'warn'],
+      ['本地索引球员', (x.indexPlayers || 0) + ' 人', '']
+    ].map(([l, v, c]) => `<div class="card flat tc" style="padding:18px">
+        <div class="tiny">${esc(l)}</div>
+        <div style="font-size:22px;font-weight:600;letter-spacing:-.02em" class="${c}">${esc(String(v))}</div>
+      </div>`).join('');
+    const rows = (x.recent || []).slice(0, 12);
+    document.getElementById('liveRecent').innerHTML = rows.length
+      ? rows.map(r2 => `<tr>
+          <td class="nowrap small">${esc(new Date(r2.at).toLocaleString('zh-CN'))}</td>
+          <td>${liveBadge(r2.kind === 'live' ? 'live' : r2.kind === 'cached' ? 'cached' : 'offline')}</td>
+          <td class="small">${esc(r2.label || '—')}</td></tr>`).join('')
+      : '<tr><td colspan="3" class="muted">尚无实时取数记录</td></tr>';
+  } catch (e) { }
+})();
+
+document.getElementById('probeBtn').addEventListener('click', async () => {
+  const b = document.getElementById('probeBtn'), t = document.getElementById('probeTip');
+  b.disabled = true; b.textContent = '测试中…';
+  t.innerHTML = '<span class="spinner"></span> 正在向数据源发起一次真实请求…';
+  try {
+    const r = await api.get('/api/live/probe');
+    const p = r.probe || {};
+    t.innerHTML = p.online
+      ? `✅ 联网正常：${esc(p.sample)} · 耗时 ${p.latencyMs} ms · 校验于 ${esc(new Date(p.checkedAt).toLocaleString('zh-CN'))}`
+      : `⚠️ 联网失败：${esc(p.error || '数据源未返回数据')}。此时系统只会展示上次联网获取的真实数据，不会填充任何估算值。`;
+    setTimeout(() => location.reload(), 3000);
+  } catch (e) { t.textContent = '测试失败：' + e.message; }
+  b.disabled = false; b.textContent = '测试实时连通性';
+});
+
+document.getElementById('refreshNow').addEventListener('click', async () => {
+  const b = document.getElementById('refreshNow'), t = document.getElementById('refreshTip');
+  b.disabled = true; b.textContent = '刷新中…';
+  t.innerHTML = '<span class="spinner"></span> 正在回源拉取真实数据，请稍候（受数据源限速保护，需要数十秒）…';
+  try {
+    const r = await api.post('/api/refresh/now', {});
+    const x = r.result || {};
+    t.innerHTML = `✅ 本轮完成：成功刷新 <b>${x.okCount || 0}</b> 支球队，
+      失败 ${x.failCount || 0} 支，写入 <b>${x.players || 0}</b> 名真实球员`;
+    setTimeout(() => location.reload(), 2500);
+  } catch (e) { t.textContent = '刷新失败：' + e.message; }
+  b.disabled = false; b.textContent = '立即回源刷新';
+});
+
+/* ---------- 单球员溯源 ---------- */
+document.getElementById('pbtn').addEventListener('click', doProv);
+document.getElementById('pq').addEventListener('keydown', e => { if (e.key === 'Enter') doProv(); });
+
+async function doProv() {
+  const q = document.getElementById('pq').value.trim();
+  const tip = document.getElementById('ptip'), box = document.getElementById('provBox');
+  if (!q) { tip.textContent = '请输入球员名'; return; }
+  tip.innerHTML = '<span class="spinner"></span> 检索并溯源…';
+  box.innerHTML = '';
+  try {
+    const r = await api.get('/api/players?q=' + encodeURIComponent(q) + '&limit=5');
+    if (!r.players.length) { tip.textContent = '未检索到该球员'; return; }
+    const p = r.players[0];
+    const a = (await api.get('/api/truth/player?id=' + encodeURIComponent(p.id))).audit;
+    tip.textContent = `已溯源：${p.name}（若非目标球员，请输得更完整）`;
+
+    const cross = a.crossCheck.length
+      ? a.crossCheck.map(c => c.url
+        ? `<a class="badge info" href="${esc(c.url)}" target="_blank" rel="noopener">${esc(c.label)} 交叉核对</a>`
+        : `<span class="badge">${esc(c.label)}：${esc(c.id)}</span>`).join(' ')
+      : '<span class="small muted">该球员无外部 ID，无法交叉核对</span>';
+
+    box.innerHTML = `
+      <div class="note blue">
+        <b>${esc(a.name)}</b> · 档案完整度 <b>${a.completeness}%</b>（${a.realFilled}/${a.realTotal} 项真实字段有值）
+        <div class="mt8 small">来源：${esc(a.source)}
+          ${a.sourceUrl ? ` · <a href="${esc(a.sourceUrl)}" target="_blank" rel="noopener">查看原始档案</a>` : ''}
+          · 抓取时间：${esc((a.fetchedAt || '—').replace('T', ' ').slice(0, 19))}</div>
+        <div class="mt8">${cross}</div>
+      </div>
+      ${a.missingReal.length ? `<div class="note mt12">缺失的真实字段：${a.missingReal.map(esc).join(' · ')}</div>` : ''}
+      <div class="tbl-scroll mt16">
+        <table class="table prov">
+          <thead><tr><th>字段</th><th>来源类型</th><th>数值</th><th>说明</th></tr></thead>
+          <tbody>
+            ${a.rows.map(r => `<tr>
+              <td><b>${esc(r.label)}</b></td>
+              <td><span class="kind ${r.kind}">${KIND_CN[r.kind]}</span></td>
+              <td>${r.value != null ? esc(r.value) : '<span class="muted">暂无数据</span>'}</td>
+              <td class="small muted">${esc(r.note)}</td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>`;
+  } catch (e) { tip.textContent = '查询失败：' + e.message; }
+}
+</script>
+</body>
+</html>

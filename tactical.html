@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>完整战术体系 · 球员挖掘系统</title>
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+<div id="nav"></div>
+
+<section class="wrap section">
+  <div class="eyebrow">模块一 · 完整战术系统</div>
+  <h1>球队体系与需求定义</h1>
+  <p class="lede">
+    先选定一支<b>真实存在的俱乐部</b>，再定义它的战术指纹。
+    系统会载入该队公开在册的真实阵容，并按你的体系逐槽位核算缺口。
+  </p>
+</section>
+
+<!-- ============ 1. 选择真实球队 ============ -->
+<section class="wrap section tight">
+  <div class="card">
+    <div class="between">
+      <h3>① 我的球队（全球真实俱乐部）</h3>
+      <span class="small muted" id="clubState"></span>
+    </div>
+    <p class="small muted mt8">支持任意国家、任意级别的注册俱乐部。未收录的球队会即时从公开数据源抓取其真实阵容入库。</p>
+
+    <div class="row mt16">
+      <input type="search" id="clubQ" placeholder="输入俱乐部名称，例如：Arsenal / 上海海港 / Flamengo" style="max-width:380px">
+      <button class="btn" id="clubSearchBtn">搜索</button>
+      <a class="btn ghost" href="index.html">从五大联赛选择</a>
+      <span class="small muted" id="clubTip"></span>
+    </div>
+
+    <div class="grid g2 mt16" id="clubList"></div>
+
+    <div id="clubPicked" class="note blue mt16" style="display:none"></div>
+  </div>
+</section>
+
+<!-- ============ 2. 阵型 + 球场 ============ -->
+<section class="wrap section tight">
+  <div class="card">
+    <div class="between">
+      <h3>② 主力阵型</h3>
+      <div class="phase-seg" id="phaseSeg">
+        <button data-phase="attack" class="active">进攻站位</button>
+        <button data-phase="defense">防守站位</button>
+      </div>
+    </div>
+    <div class="grid pitch-grid mt16">
+      <div class="pitch" id="pitch">
+        <div class="pitch-circle"></div><div class="pitch-box top"></div><div class="pitch-box bottom"></div>
+      </div>
+      <div>
+        <div class="field">
+          <label>阵型</label>
+          <select id="formation"></select>
+        </div>
+        <p class="small muted mt8" id="formationDesc"></p>
+        <div class="row mt16">
+          <span class="badge tier" id="famBadge"></span>
+          <span class="badge" id="slotCount"></span>
+        </div>
+        <div class="note gray mt16">
+          球场图中的圆点表示该阵型的 11 个位置槽位，可在上方切换<b>进攻站位</b>（拉开前压）与<b>防守站位</b>（收紧回撤）。
+          若已载入真实球队，颜色反映该槽位是否有在册球员：<b>白色</b>=齐备，<b>黄色</b>=深度不足，<b>红色</b>=无人可用。
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 2.5 自定义阵型编辑器 ============ -->
+<section class="wrap section tight">
+  <div class="card">
+    <div class="between">
+      <h3>②½ 自定义阵型排版（拖拽定位）</h3>
+      <button class="btn ghost" id="resetCustom">恢复内置阵型</button>
+    </div>
+    <p class="small muted mt8">
+      在球场上<b>拖动</b>任意位置圆点即可自定义该槽位在进攻/防守时的站位，形成你自己的阵型排版。
+      自定义会参与下方「槽位需求矩阵」与「阵容缺口」的实时计算。位置组成仍必须是 11 人，系统只调整站位坐标、不改变位置职责。
+    </p>
+    <div class="row mt16">
+      <span class="small muted">拖动位置：</span>
+      <div class="editor-bar" id="posPalette"></div>
+    </div>
+    <div class="row mt16">
+      <span class="small muted">编辑器视角：</span>
+      <div class="phase-seg" id="editPhaseSeg">
+        <button data-ephase="attack" class="active">进攻站位</button>
+        <button data-ephase="defense">防守站位</button>
+      </div>
+    </div>
+    <div class="grid pitch-grid mt16">
+      <div class="pitch editing" id="editPitch">
+        <div class="pitch-circle"></div><div class="pitch-box top"></div><div class="pitch-box bottom"></div>
+      </div>
+      <div>
+        <div class="field"><label>自定义阵型名称（可选）</label><input type="text" id="customName" placeholder="例如：我的 3-2-4-1"></div>
+        <div class="small muted mt8" id="customStat"></div>
+        <div class="row mt16">
+          <button class="btn" id="applyCustom">应用到战术体系</button>
+          <span class="small muted" id="customTip"></span>
+        </div>
+        <div class="note gray mt16" id="customHint">拖动上方「拖动位置」里的位置名，即可在左侧球场上自由摆放；再切换进攻/防守视图分别调整两套站位。</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 3. 战术风格 ============ -->
+<section class="wrap section tight">
+  <div class="card">
+    <h3>③ 战术风格（建队哲学）</h3>
+    <div class="grid g4 mt16" id="styleCards"></div>
+    <p class="small muted mt16" id="styleDesc"></p>
+  </div>
+</section>
+
+<!-- ============ 4. 六维调节 ============ -->
+<section class="wrap section tight">
+  <div class="card">
+    <h3>④ 战术维度微调</h3>
+    <p class="small muted mt8">
+      这六项会实时改写每个位置的<b>角色需求</b>（理想年龄窗口、联赛级别门槛、体系重要性），
+      进而改变全库的排序结果。全部为模型参数，不影响任何真实数据。
+    </p>
+    <div class="grid g2 mt16" id="dims"></div>
+  </div>
+</section>
+
+<!-- ============ 5. 体系自检 ============ -->
+<section class="wrap section tight">
+  <div class="card">
+    <h3>⑤ 体系自检</h3>
+    <div id="validate"></div>
+  </div>
+</section>
+
+<!-- ============ 6. 槽位需求矩阵 ============ -->
+<section class="wrap section tight">
+  <div class="card">
+    <div class="between">
+      <h3>⑥ 槽位角色需求矩阵</h3>
+      <span class="badge info" id="matrixStyle"></span>
+    </div>
+    <p class="small muted mt8">
+      下表展示当前体系下每个位置槽位的需求画像。<b>角色与特质属于足球战术常识</b>；
+      年龄窗口与级别门槛已按你的六维参数实时修正。
+    </p>
+    <div class="tbl-scroll mt16">
+      <table class="table slot-tbl">
+        <thead><tr>
+          <th>位置</th><th>人数</th><th>体系角色</th><th>关键特质</th>
+          <th>理想年龄</th><th>联赛门槛</th><th>重要性</th><th>在册</th><th>在册球员</th>
+        </tr></thead>
+        <tbody id="matrixBody"></tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 7. 保存 ============ -->
+<section class="wrap section tight">
+  <div class="card">
+    <h3>⑦ 保存并应用</h3>
+    <div class="grid g3 mt16">
+      <div class="field"><label>转会预算上限（万欧元）</label><input type="number" id="budget" min="0" step="100"></div>
+      <div class="field"><label>工资帽（年薪总额，万欧元）</label><input type="number" id="wageCap" min="0" step="100"></div>
+      <div class="field"><label>本窗目标引援数</label><input type="number" id="targetCount" min="0" step="1"></div>
+    </div>
+    <div class="btn-row mt24">
+      <button class="btn" id="saveBtn">保存战术体系</button>
+      <a class="btn ghost" href="scout.html">进入智能挖掘</a>
+      <a class="btn ghost" href="cockpit.html">查看阵容缺口</a>
+      <span class="small muted" id="saveTip"></span>
+    </div>
+  </div>
+</section>
+
+<div id="foot"></div>
+<script src="assets/js/common.js"></script>
+<script>
+renderNav('tactical.html');
+
+/* 阵型槽位在球场上的坐标（x 横向 0-100，y 纵向 0=对方球门 100=本方球门） */
+const LAYOUT = {
+  '433':  [['GK',50,92],['LB',15,76],['CB',38,80],['CB',62,80],['RB',85,76],['DM',50,62],['CM',32,51],['CM',68,51],['LW',15,26],['ST',50,18],['RW',85,26]],
+  '442':  [['GK',50,92],['LB',15,76],['CB',38,80],['CB',62,80],['RB',85,76],['LW',15,50],['CM',38,56],['CM',62,56],['RW',85,50],['ST',38,20],['ST',62,20]],
+  '4231': [['GK',50,92],['LB',15,76],['CB',38,80],['CB',62,80],['RB',85,76],['DM',38,64],['DM',62,64],['LW',15,38],['AM',50,45],['RW',85,38],['ST',50,18]],
+  '4312': [['GK',50,92],['LB',15,76],['CB',38,80],['CB',62,80],['RB',85,76],['DM',50,68],['CM',30,55],['CM',70,55],['AM',50,42],['ST',35,20],['ST',65,20]],
+  '4141': [['GK',50,92],['LB',15,76],['CB',38,80],['CB',62,80],['RB',85,76],['DM',50,68],['LW',15,48],['CM',38,52],['CM',62,52],['RW',85,48],['ST',50,18]],
+  '451':  [['GK',50,92],['LB',15,76],['CB',38,80],['CB',62,80],['RB',85,76],['DM',35,66],['DM',65,66],['CM',35,52],['CM',65,52],['AM',50,40],['ST',50,18]],
+  '352':  [['GK',50,92],['CB',25,80],['CB',50,83],['CB',75,80],['LW',12,55],['DM',50,66],['CM',32,50],['CM',68,50],['RW',88,55],['ST',38,20],['ST',62,20]],
+  '343':  [['GK',50,92],['CB',25,80],['CB',50,83],['CB',75,80],['DM',38,64],['DM',62,64],['LW',13,45],['AM',50,42],['RW',87,45],['ST',36,18],['ST',64,18]],
+  '532':  [['GK',50,92],['CB',25,80],['CB',50,83],['CB',75,80],['LB',10,74],['RB',90,74],['CM',30,52],['CM',50,57],['CM',70,52],['ST',38,20],['ST',62,20]],
+  '541':  [['GK',50,92],['CB',25,80],['CB',50,83],['CB',75,80],['LB',10,74],['RB',90,74],['DM',35,62],['DM',65,62],['CM',35,48],['CM',65,48],['ST',50,18]]
+};
+const FAMILY_CN = { '四后卫':'四后卫体系', '三中卫':'三中卫体系', '五后卫':'五后卫体系' };
+
+let CAT = null;            // 战术目录
+let P = Object.assign({}, DEFAULT_PROFILE);
+let MYCLUB = null;
+let GAP = null;            // 真实阵容缺口
+let dimsUI = {};
+let phase = 'attack';      // 当前攻守视角
+let customSlots = null;    // 自定义阵型槽位（含坐标）；null = 使用内置
+let customPhase = 'attack';// 编辑器当前视角
+let editingPos = null;     // 编辑器当前要摆放的位置代号
+
+/* ---------- 初始化 ---------- */
+(async function init() {
+  P = await loadProfile();
+  dimsUI = {
+    tempo: P.tempo || 3, press: P.press || 3,
+    buildout: P.buildout || 'mixed', line: P.line || 'mid',
+    width: P.width || 'balanced', transition: P.transition || 'recover',
+    fullback: P.fullback || 'balanced', setpiece: P.setpiece || 'mid', pivot: P.pivot || 'single'
+  };
+  customSlots = (Array.isArray(P.customSlots) && P.customSlots.length) ? P.customSlots : null;
+  CAT = (await api.get('/api/tactics'));
+  try { MYCLUB = (await api.get('/api/my-club')).club; } catch (e) { MYCLUB = null; }
+
+  buildFormationSelect();
+  buildStyleCards();
+  buildDims();
+  bindUI();
+  syncFromProfile();
+  renderPicked();
+  renderEditor();
+  refresh();
+})();
+
+/* ---------- 球队 ---------- */
+document.getElementById('clubSearchBtn').addEventListener('click', searchClubs);
+document.getElementById('clubQ').addEventListener('keydown', e => { if (e.key === 'Enter') searchClubs(); });
+
+async function searchClubs() {
+  const q = document.getElementById('clubQ').value.trim();
+  const box = document.getElementById('clubList');
+  const tip = document.getElementById('clubTip');
+  if (!q) { tip.textContent = '请输入俱乐部名称'; return; }
+  tip.innerHTML = '<span class="spinner"></span> 正在检索全球俱乐部…';
+  box.innerHTML = '';
+  try {
+    const r = await api.get('/api/clubs?q=' + encodeURIComponent(q));
+    if (r.error) tip.textContent = '数据源提示：' + r.error;
+    else tip.textContent = `命中 ${r.clubs.length} 家俱乐部` + (r.cached ? '（来自本地缓存）' : '（实时拉取）');
+    box.innerHTML = (r.clubs || []).map(c => `
+      <div class="club-item" data-id="${esc(c.id)}" data-name="${esc(c.name)}"
+           data-league="${esc(c.league || '')}" data-leagueid="${esc(c.leagueId || '')}">
+        ${c.badge ? `<img src="${esc(c.badge)}" alt="" onerror="this.style.display='none'">` : '<span></span>'}
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:600;font-size:14px">${esc(c.name)}</div>
+          <div class="small muted">${esc(c.league || '联赛未知')}${c.tier ? ' · 第 ' + c.tier + ' 档' : ''}</div>
+        </div>
+        ${c.inIndex ? `<span class="badge ok">已收录 ${c.squadSize} 人</span>` : '<span class="badge">待抓取</span>'}
+      </div>`).join('') || '<div class="small muted">未命中，请尝试英文名或更简短的关键词</div>';
+
+    box.querySelectorAll('.club-item').forEach(el => el.addEventListener('click', () => pickClub(el)));
+  } catch (e) { tip.textContent = '检索失败：' + e.message; }
+}
+
+async function pickClub(el) {
+  const body = {
+    teamId: el.dataset.id, teamName: el.dataset.name,
+    league: el.dataset.league || null, leagueId: el.dataset.leagueid || null
+  };
+  const tip = document.getElementById('clubTip');
+  tip.innerHTML = '<span class="spinner"></span> 正在抓取 ' + esc(body.teamName) + ' 的真实阵容…';
+  try {
+    const r = await api.post('/api/my-club', body);
+    MYCLUB = r.club;
+    P.club = body.teamName;
+    if (r.error) tip.textContent = '阵容抓取提示：' + r.error;
+    else tip.textContent = `已载入 ${r.added} 名真实在册球员` + (r.cached ? '（本地缓存）' : '（实时拉取）');
+    renderPicked();
+    refresh();
+  } catch (e) { tip.textContent = '载入失败：' + e.message; }
+}
+
+function renderPicked() {
+  const el = document.getElementById('clubPicked');
+  const st = document.getElementById('clubState');
+  if (!MYCLUB || !MYCLUB.teamId) { el.style.display = 'none'; st.textContent = '尚未选择'; return; }
+  el.style.display = '';
+  const warn = MYCLUB.squadWarning
+    ? `<div class="mt8">⚠ ${esc(MYCLUB.squadWarning)}：系统不会编造阵容，该队当前无可用真实名单。</div>` : '';
+  el.innerHTML = `<b>我的球队：${esc(MYCLUB.teamName || '—')}</b>
+    <div class="mt8">联赛：${esc(MYCLUB.league || '未知')}　·　在册球员：${MYCLUB.squadSize != null ? MYCLUB.squadSize + ' 人' : '未知'}　·　载入时间：${esc((MYCLUB.loadedAt || '').replace('T', ' ').slice(0, 19))}</div>${warn}`;
+  st.textContent = MYCLUB.teamName || '';
+}
+
+/* ---------- 阵型 ---------- */
+function buildFormationSelect() {
+  const sel = document.getElementById('formation');
+  sel.innerHTML = Object.keys(CAT.formations).map(k =>
+    `<option value="${k}">${esc(CAT.formations[k].cn)}　${esc(CAT.formations[k].family)}</option>`).join('');
+}
+function buildStyleCards() {
+  document.getElementById('styleCards').innerHTML = Object.keys(CAT.styles).map(k => {
+    const s = CAT.styles[k];
+    return `<div class="card flat" data-style="${k}" style="cursor:pointer;padding:16px">
+      <div style="font-weight:600;font-size:15px">${esc(s.cn)}</div>
+      <div class="small muted mt8" style="min-height:52px">${esc(s.desc)}</div>
+      <div class="small muted mt8">常用：${s.formations.map(f => esc(CAT.formations[f].cn)).join(' · ')}</div>
+    </div>`;
+  }).join('');
+  document.getElementById('styleCards').querySelectorAll('[data-style]').forEach(el =>
+    el.addEventListener('click', () => { P.style = el.dataset.style; syncFromProfile(); refresh(); }));
+}
+
+/* ---------- 六维 ---------- */
+function buildDims() {
+  document.getElementById('dims').innerHTML = Object.keys(CAT.dimensions).map(k => {
+    const d = CAT.dimensions[k];
+    if (k === 'tempo' || k === 'press') {
+      return `<div>
+        <label style="font-size:12px;color:var(--muted);font-weight:600">${esc(d.cn)}</label>
+        <div class="range-row mt8"><input type="range" data-dim="${k}" min="1" max="5" step="1"><span class="val"></span></div>
+        <div class="small muted mt8" id="hint_${k}"></div>
+      </div>`;
+    }
+    return `<div class="field">
+      <label>${esc(d.cn)}</label>
+      <select data-dim="${k}">${d.options.map(([v, t]) => `<option value="${esc(v)}">${esc(t)}</option>`).join('')}</select>
+    </div>`;
+  }).join('');
+  document.getElementById('dims').querySelectorAll('[data-dim]').forEach(el =>
+    el.addEventListener('input', () => {
+      dimsUI[el.dataset.dim] = el.type === 'range' ? Number(el.value) : el.value;
+      refresh();
+    }));
+}
+
+function bindUI() {
+  document.getElementById('formation').addEventListener('change', e => { P.formation = e.target.value; customSlots = null; renderEditor(); refresh(); });
+  /* 攻守站位切换 */
+  document.getElementById('phaseSeg').querySelectorAll('button').forEach(b =>
+    b.addEventListener('click', () => { phase = b.dataset.phase; syncPhase(); refresh(); }));
+  /* 自定义编辑器 */
+  document.getElementById('posPalette').addEventListener('click', e => {
+    const chip = e.target.closest('.chip'); if (!chip) return;
+    editingPos = chip.dataset.pos;
+    document.getElementById('posPalette').querySelectorAll('.chip').forEach(c => c.classList.toggle('selected', c.dataset.pos === editingPos));
+    document.getElementById('customHint').textContent = `点击左侧球场即可摆放「${CAT.positionCn[editingPos] || editingPos}」（当前 ${customPhase === 'attack' ? '进攻' : '防守'}视角）`;
+  });
+  document.getElementById('editPitch').addEventListener('click', e => {
+    if (!editingPos) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = Math.round(Math.max(2, Math.min(98, (e.clientX - rect.left) / rect.width * 100)));
+    const y = Math.round(Math.max(2, Math.min(98, (e.clientY - rect.top) / rect.height * 100)));
+    placePos(editingPos, x, y);
+  });
+  document.getElementById('editPhaseSeg').querySelectorAll('button').forEach(b =>
+    b.addEventListener('click', () => {
+      customPhase = b.dataset.ephase;
+      document.getElementById('editPhaseSeg').querySelectorAll('button').forEach(x => x.classList.toggle('active', x.dataset.ephase === customPhase));
+      renderEditPitch();
+    }));
+  document.getElementById('applyCustom').addEventListener('click', () => {
+    if (!customSlots) return;
+    const nm = document.getElementById('customName').value.trim();
+    P.formation = 'custom:' + (nm || '自定');
+    refresh();
+    const t = document.getElementById('customTip'); t.textContent = '已应用自定义阵型'; setTimeout(() => t.textContent = '', 2500);
+  });
+  document.getElementById('resetCustom').addEventListener('click', () => {
+    customSlots = null; editingPos = null;
+    document.getElementById('customName').value = '';
+    if (String(P.formation).startsWith('custom:')) P.formation = '433';
+    renderEditor(); refresh();
+  });
+}
+
+function syncFromProfile() {
+  document.getElementById('formation').value = CAT.formations[P.formation] ? P.formation : '433';
+  document.getElementById('budget').value = P.budget;
+  document.getElementById('wageCap').value = P.wageCap;
+  document.getElementById('targetCount').value = P.targetCount == null ? 3 : P.targetCount;
+  document.getElementById('dims').querySelectorAll('[data-dim]').forEach(el => {
+    const k = el.dataset.dim;
+    el.value = dimsUI[k];
+    if (el.type === 'range') {
+      const opt = CAT.dimensions[k].options.find(o => String(o[0]) === String(dimsUI[k]));
+      el.parentNode.querySelector('.val').textContent = dimsUI[k] + ' / 5';
+      const h = document.getElementById('hint_' + k); if (h) h.textContent = opt ? opt[1] : '';
+    }
+  });
+  document.getElementById('styleCards').querySelectorAll('[data-style]').forEach(el =>
+    el.style.borderColor = (el.dataset.style === P.style) ? 'var(--blue)' : '');
+}
+
+/* ---------- 渲染 ---------- */
+async function refresh() {
+  if (!CAT) return;
+  const isCustomFmt = String(P.formation).startsWith('custom:');
+  const f = isCustomFmt ? { cn: P.formation.replace('custom:', ''), family: '自定义', desc: '自定义阵型：由你在编辑器里拖拽摆放的 11 人站位。', slots: (customSlots || []).map(s => ({ pos: s.pos, n: s.n })) } : (CAT.formations[P.formation] || CAT.formations['433']);
+  const st = CAT.styles[P.style] || CAT.styles.balanced;
+
+  document.getElementById('formationDesc').textContent = f.desc;
+  document.getElementById('famBadge').textContent = f.family;
+  document.getElementById('slotCount').textContent = f.slots.reduce((a, s) => a + s.n, 0) + ' 个位置槽位';
+  document.getElementById('styleDesc').textContent = st.cn + '：' + st.desc;
+  document.getElementById('matrixStyle').textContent = st.cn;
+
+  /* 球场（按攻守视角切换坐标） */
+  const pitch = document.getElementById('pitch');
+  pitch.classList.toggle('defensive', phase === 'defense');
+  pitch.querySelectorAll('.slot').forEach(e => e.remove());
+  const layout = currentLayout();
+  const statusByPos = {};
+  if (GAP) for (const s of GAP.gap.slots) statusByPos[s.pos] = s.status;
+  layout.forEach(([pos, x, y], i) => {
+    const s = document.createElement('div');
+    s.className = 'slot';
+    s.style.left = x + '%'; s.style.top = y + '%';
+    const cls = statusByPos[pos] === 'empty' ? 'empty' : (statusByPos[pos] === 'thin' ? 'thin' : 'ok');
+    s.innerHTML = `<span class="dot ${cls}">${esc(CAT.positionCn[pos] || pos)}</span>`;
+    pitch.appendChild(s);
+  });
+
+  /* 体系自检 */
+  try {
+    const v = await api.post('/api/tactics/validate', { formation: isCustomFmt ? '433' : P.formation, style: P.style, dims: dimsUI });
+    const box = document.getElementById('validate');
+    if (v.valid.ok) box.innerHTML = `<div class="note blue">✅ 体系自洽：${esc(f.cn)} 搭配「${esc(st.cn)}」与当前维度参数没有冲突。</div>`;
+    else box.innerHTML = `<div class="note">⚠ 发现 ${v.valid.issues.length} 处配置冲突：<br>· ` +
+      v.valid.issues.map(esc).join('<br>· ') + `</div>`;
+  } catch (e) { }
+
+  /* 需求矩阵 */
+  renderMatrix();
+
+  /* 缺口（若已选球队） */
+  if (MYCLUB && MYCLUB.teamId) {
+    try {
+      const params = new URLSearchParams();
+      params.set('formation', P.formation); params.set('style', P.style);
+      Object.keys(dimsUI).forEach(k => params.set(k, dimsUI[k]));
+      if (customSlots) params.set('custom', JSON.stringify(customSlots));
+      const r = await api.get('/api/squad-gap?' + params.toString());
+      GAP = r;
+    } catch (e) { GAP = null; }
+    renderMatrix();
+  }
+}
+
+function renderMatrix() {
+  if (!CAT) return;
+  const f = CAT.formations[P.formation] || CAT.formations['433'];
+  const style = P.style || 'balanced';
+  /* 槽位来源：自定义阵型用 customSlots，否则用内置 */
+  const slotDefs = customSlots || f.slots;
+  const rows = slotDefs.map(s => {
+    const gapSlot = GAP && GAP.gap.slots.find(x => x.pos === s.pos);
+    const role = gapSlot ? gapSlot.role : '';
+    const traits = gapSlot ? gapSlot.traits : [];
+    const ageW = gapSlot ? gapSlot.ageWindow : null;
+    const gate = gapSlot ? gapSlot.tierGate : null;
+    const imp = gapSlot ? gapSlot.importance : null;
+    const have = gapSlot ? `${gapSlot.have}/${gapSlot.need}` : '—';
+    const badge = !gapSlot ? '' : (gapSlot.status === 'empty' ? '<span class="badge err">缺人</span>'
+      : gapSlot.status === 'thin' ? '<span class="badge warn">偏薄</span>'
+        : gapSlot.status === 'aging' ? '<span class="badge warn">老化</span>' : '<span class="badge ok">齐备</span>');
+    /* 在册球员：中文姓名优先，回退英文原名 */
+    const holders = (gapSlot && gapSlot.holders) || [];
+    const holderHtml = holders.length
+      ? holders.map(h => `<div class="holder">${h.nameCn ? `<span class="cn">${esc(h.nameCn)}</span>` : ''}<span class="en">${esc(h.name)}</span></div>`).join('')
+      : '<span class="muted">—</span>';
+    return `<tr>
+      <td><b>${esc(CAT.positionCn[s.pos] || s.pos)}</b></td>
+      <td class="num">${s.n}</td>
+      <td>${role ? esc(role) : '<span class="muted">需载入球队后计算</span>'}</td>
+      <td class="trait">${traits.length ? traits.map(esc).join(' · ') : '—'}</td>
+      <td class="num">${ageW ? ageW[0] + '–' + ageW[1] + ' 岁' : '—'}</td>
+      <td class="num">${gate ? '第 ' + gate + ' 档以内' : '—'}</td>
+      <td class="num">${imp != null ? imp : '—'}</td>
+      <td>${have} ${badge}</td>
+      <td>${holderHtml}</td>
+    </tr>`;
+  }).join('');
+  document.getElementById('matrixBody').innerHTML = rows;
+}
+
+/* ---------- 攻守站位 & 自定义编辑器 ---------- */
+/* 返回当前阵型在指定视角下的 [pos, x, y] 列表 */
+function baseShape(fmt, view) {
+  const shapes = (CAT && CAT.shapes) || {};
+  return (shapes[fmt] && shapes[fmt][view]) || shapes['433'][view];
+}
+function currentLayout() {
+  if (customSlots) return customSlots.filter(s => s.x != null && s.y != null).map(s => [s.pos, s.x, s.y]);
+  return baseShape(P.formation, phase);
+}
+function syncPhase() {
+  document.getElementById('phaseSeg').querySelectorAll('button').forEach(b =>
+    b.classList.toggle('active', b.dataset.phase === phase));
+}
+function renderEditor() {
+  const palette = document.getElementById('posPalette');
+  /* 位置按钮（含重复数，按当前阵型槽位） */
+  const base = customSlots || (CAT.formations[P.formation] && CAT.formations[P.formation].slots) || CAT.formations['433'].slots;
+  palette.innerHTML = base.map(s => `<span class="chip" data-pos="${esc(s.pos)}">${esc(CAT.positionCn[s.pos] || s.pos)}${s.n > 1 ? ' ×' + s.n : ''}</span>`).join('');
+  if (editingPos && !base.some(s => s.pos === editingPos)) editingPos = null;
+  palette.querySelectorAll('.chip').forEach(c => c.classList.toggle('selected', c.dataset.pos === editingPos));
+  document.getElementById('customHint').textContent = editingPos
+    ? `点击左侧球场摆放「${CAT.positionCn[editingPos] || editingPos}」` : '先从上方选择要拖动的位置';
+  renderEditPitch();
+  updateCustomStat();
+}
+function renderEditPitch() {
+  const pitch = document.getElementById('editPitch');
+  pitch.classList.toggle('defensive', customPhase === 'defense');
+  pitch.querySelectorAll('.slot,.drop-zone').forEach(e => e.remove());
+  const layout = customSlots ? customSlots.filter(s => s.x != null && s.y != null).map(s => [s.pos, s.x, s.y]) : baseShape(P.formation, customPhase);
+  layout.forEach(([pos, x, y]) => {
+    const s = document.createElement('div');
+    s.className = 'slot drag';
+    s.dataset.pos = pos;
+    s.style.left = x + '%'; s.style.top = y + '%';
+    s.title = (CAT.positionCn[pos] || pos) + '（点击后拖动重新摆放）';
+    s.innerHTML = `<span class="dot">${esc(CAT.positionCn[pos] || pos)}</span>`;
+    s.addEventListener('mousedown', e => {
+      editingPos = pos;
+      document.getElementById('posPalette').querySelectorAll('.chip').forEach(c => c.classList.toggle('selected', c.dataset.pos === pos));
+      document.getElementById('customHint').textContent = `正在拖动「${CAT.positionCn[pos] || pos}」，松开即定位`;
+    });
+    pitch.appendChild(s);
+  });
+  /* 拖动：监听 pitch 的 mousemove/mouseup */
+  pitch.onmousemove = e => {
+    if (!editingPos) return;
+    const rect = pitch.getBoundingClientRect();
+    const x = Math.round(Math.max(2, Math.min(98, (e.clientX - rect.left) / rect.width * 100)));
+    const y = Math.round(Math.max(2, Math.min(98, (e.clientY - rect.top) / rect.height * 100)));
+    pitch.querySelectorAll('.slot').forEach(el => { if (el.dataset.pos === editingPos) { el.style.left = x + '%'; el.style.top = y + '%'; } });
+  };
+  pitch.onmouseup = e => {
+    if (!editingPos) return;
+    const rect = pitch.getBoundingClientRect();
+    const x = Math.round(Math.max(2, Math.min(98, (e.clientX - rect.left) / rect.width * 100)));
+    const y = Math.round(Math.max(2, Math.min(98, (e.clientY - rect.top) / rect.height * 100)));
+    placePos(editingPos, x, y);
+    editingPos = null;
+    document.getElementById('posPalette').querySelectorAll('.chip').forEach(c => c.classList.remove('selected'));
+    document.getElementById('customHint').textContent = '拖动位置名或球场圆点，即可自定义站位';
+  };
+}
+function placePos(pos, x, y) {
+  /* 初始化自定义槽位（沿用当前阵型的位置组成，按位置分组，n=该位置人数） */
+  if (!customSlots) {
+    const base = (CAT.formations[P.formation] && CAT.formations[P.formation].slots) || CAT.formations['433'].slots;
+    customSlots = base.map(s => ({ pos: s.pos, n: s.n, x: null, y: null }));
+  }
+  const target = customSlots.find(s => s.pos === pos);
+  if (target) { target.x = x; target.y = y; }
+  renderEditPitch();
+  updateCustomStat();
+}
+function updateCustomStat() {
+  const st = document.getElementById('customStat');
+  if (!customSlots) { st.textContent = '尚未自定义，当前使用内置阵型站位。'; return; }
+  const placed = customSlots.filter(s => s.x != null).length;
+  st.textContent = `已自定义 ${customSlots.length} 个位置（${placed} 个已定位）· 切换「进攻/防守」分别调整两套站位。`;
+}
+
+/* ---------- 保存 ---------- */
+document.getElementById('saveBtn').addEventListener('click', async () => {
+  P.tempo = dimsUI.tempo; P.press = dimsUI.press;
+  P.buildout = dimsUI.buildout; P.line = dimsUI.line;
+  P.width = dimsUI.width; P.transition = dimsUI.transition;
+  P.fullback = dimsUI.fullback; P.setpiece = dimsUI.setpiece; P.pivot = dimsUI.pivot;
+  P.budget = num(document.getElementById('budget').value) || 0;
+  P.wageCap = num(document.getElementById('wageCap').value) || 0;
+  P.targetCount = num(document.getElementById('targetCount').value) || 3;
+  P.customSlots = customSlots || null;
+  if (MYCLUB) {
+    P.myClub = { teamId: MYCLUB.teamId, teamName: MYCLUB.teamName, league: MYCLUB.league, tier: MYCLUB.tier };
+    await api.post('/api/my-club', Object.assign({}, MYCLUB, {
+      formation: P.formation, style: P.style, dims: dimsUI, customSlots: customSlots || null
+    })).catch(() => { });
+  }
+  saveProfile(P);
+  const t = document.getElementById('saveTip');
+  t.textContent = '已保存 ' + new Date().toLocaleTimeString('zh-CN');
+  setTimeout(() => t.textContent = '', 3000);
+});
+</script>
+</body>
+</html>

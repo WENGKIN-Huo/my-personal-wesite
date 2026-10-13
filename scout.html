@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>智能挖掘 · 球员挖掘系统</title>
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+<div id="nav"></div>
+
+<section class="wrap section">
+  <div class="eyebrow">模块二</div>
+  <h1>智能匹配与精准检索</h1>
+  <p class="lede">按战术画像对候选球员排序。适配度为本系统模型计算值，仅使用真实字段推导；
+    缺失维度不参与评分并在结果中标注。</p>
+
+  <div class="card mt24" id="profileBar">
+    <div class="between">
+      <div class="row" style="gap:16px">
+        <div><div class="card-title">当前战术画像</div><div id="pbText" class="small">加载中…</div></div>
+      </div>
+      <a class="btn ghost sm" href="tactical.html">调整体系配置</a>
+    </div>
+  </div>
+</section>
+
+<section class="wrap section tight">
+  <div class="card">
+    <h3>复合筛选</h3>
+    <div class="filters mt16">
+      <div class="field"><label>关键词（球员 / 球队 / 国籍）</label><input type="search" id="fq" placeholder="留空则浏览全库"></div>
+      <div class="field"><label>目标位置</label><select id="fpos">
+        <option value="ANY">不限</option>
+        <option value="GK">门将</option><option value="CB">中后卫</option>
+        <option value="LB">左后卫</option><option value="RB">右后卫</option>
+        <option value="FB">边后卫</option>
+        <option value="DM">后腰</option><option value="CM">中场</option>
+        <option value="AM">前腰</option><option value="LW">左边锋</option>
+        <option value="RW">右边锋</option><option value="W">边锋</option>
+        <option value="SS">影锋</option>
+        <option value="ST">中锋</option>
+      </select></div>
+      <div class="field"><label>联赛</label><select id="flea"><option value="">不限</option></select></div>
+      <div class="field"><label>年龄下限</label><input type="number" id="famin" min="15" max="45" placeholder="不限"></div>
+      <div class="field"><label>年龄上限</label><input type="number" id="famax" min="15" max="45" placeholder="不限"></div>
+      <div><button class="btn" id="searchBtn" style="width:100%">检索并排序</button></div>
+    </div>
+
+    <div class="row mt16">
+      <label class="row small" style="gap:6px;cursor:pointer">
+        <input type="checkbox" id="liveChk" checked>
+        <span>关键词检索时<b>实时联网</b>（直接向数据源请求当前值，不使用本地缓存副本）</span>
+      </label>
+      <span class="small muted">留空浏览全库时不触发联网，直接读本地真实索引</span>
+    </div>
+
+    <div class="row mt16">
+      <span class="small muted">机会标签：</span>
+      <div class="seg" id="tagSeg">
+        <button data-t="" class="on">不限</button>
+        <button data-t="young">潜力新星 ≤21</button>
+        <button data-t="prime">当打之年 27-31</button>
+        <button data-t="veteran">老将 ≥32</button>
+        <button data-t="lowtier">低级别联赛</button>
+        <button data-t="intl">现役国脚</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="wrap section tight">
+  <div class="between mb16">
+    <h3>候选池 <span class="muted small" id="countTip"></span></h3>
+    <div class="small muted" id="liveTip"></div>
+  </div>
+  <div class="card" style="padding:8px 8px 0">
+    <div class="tbl-scroll">
+      <table class="table">
+        <thead><tr>
+          <th>球员</th><th>位置</th><th>国籍</th><th>年龄</th>
+          <th>所属俱乐部 / 联赛</th><th style="min-width:150px">体系适配度</th><th style="width:110px">操作</th>
+        </tr></thead>
+        <tbody id="tbody"><tr><td colspan="7"><div class="empty">点击上方"检索并排序"开始</div></td></tr></tbody>
+      </table>
+    </div>
+    <div class="between" style="padding:12px">
+      <div class="small muted" id="pageTip"></div>
+      <div class="btn-row">
+        <button class="btn gray sm" id="prevBtn">上一页</button>
+        <button class="btn gray sm" id="nextBtn">下一页</button>
+      </div>
+    </div>
+  </div>
+  <div class="note mt16" id="gapNote">
+    <b>关于数据缺口</b>：球员身价、薪资、合同剩余年限目前无开放数据源，系统显示"暂无数据"并以空值处理，
+    不会用估算值填充。适配度中的"薪资适配"维度因此不参与评分，权重按比例分配到其余维度。
+  </div>
+</section>
+
+<section class="wrap section">
+  <h2>以人找人 · 相似球员</h2>
+  <p class="lede">输入队内现有球员或目标球员，系统基于真实可比字段（位置、年龄、联赛级别、国籍）推荐相近人选。</p>
+  <div class="card mt16">
+    <form class="row" id="simForm">
+      <input type="search" id="simQ" placeholder="输入球员姓名，如 Harry Kane" style="flex:1;min-width:240px">
+      <button class="btn" type="submit">查找相似</button>
+    </form>
+    <div id="simResult" class="mt16"></div>
+  </div>
+</section>
+
+<div id="foot"></div>
+<script src="assets/js/common.js"></script>
+<script>
+renderNav('scout.html');
+
+let P = Object.assign({}, DEFAULT_PROFILE);
+let page = 0, size = 30, tag = '';
+
+function profileText() {
+  return `${esc(P.club || '我的球队')} · 阵型 <b>${esc(P.formation)}</b> · 打法 <b>${STYLE_CN[P.style] || P.style}</b> · 压迫强度 ${P.press}/5 · 目标位置 <b>${esc(P.targetPosition === 'ANY' ? '不限' : P.targetPosition)}</b> · 取向 ${P.agePreference === 'now' ? '即战力' : P.agePreference === 'potential' ? '潜力' : '兼顾'}`;
+}
+
+async function fillLeagues() {
+  try {
+    const s = await api.get('/api/stats');
+    const sel = document.getElementById('flea');
+    Object.keys(s.byLeague).sort((a, b) => s.byLeague[b] - s.byLeague[a])
+      .forEach(l => {
+        const o = document.createElement('option');
+        o.value = l; o.textContent = `${l}（${s.byLeague[l]}）`;
+        sel.appendChild(o);
+      });
+  } catch (e) { }
+}
+
+async function run() {
+  const tbody = document.getElementById('tbody');
+  tbody.innerHTML = '<tr><td colspan="7"><div class="empty"><span class="spinner"></span> 检索中…</div></td></tr>';
+  const filters = {
+    q: document.getElementById('fq').value.trim(),
+    pos: document.getElementById('fpos').value,
+    league: document.getElementById('flea').value,
+    ageMin: document.getElementById('famin').value,
+    ageMax: document.getElementById('famax').value,
+    tag
+  };
+  /* 仅在填写关键词时实时联网：免费数据源有请求频率限制，
+     无关键词的浏览走本地真实索引（同样是历史联网抓取的真实数据） */
+  const useLive = !!document.getElementById('liveChk').checked && !!filters.q;
+  try {
+    const r = await api.post('/api/search', { profile: P, filters, page, size, live: useLive });
+    document.getElementById('countTip').textContent = `共 ${r.total} 人`;
+    document.getElementById('liveTip').innerHTML =
+      liveBadge(r.dataMode, r.fetchedAt) +
+      (r.liveAdded ? ` <span class="small muted">本次联网取回 ${r.liveAdded} 人</span>` : '');
+    document.getElementById('pageTip').textContent = r.total ? `第 ${r.page + 1} / ${Math.ceil(r.total / size)} 页` : '';
+
+    if (!r.players.length) {
+      tbody.innerHTML = '<tr><td colspan="7"><div class="empty"><h3>没有符合条件的球员</h3><p class="muted">可放宽筛选条件，或直接在关键词框输入球员名触发全球实时检索</p></div></td></tr>';
+      return;
+    }
+    const liveSet = new Set(r.liveIds || []);
+    tbody.innerHTML = r.players.map(p => {
+      const f = p.fit || {};
+      return `<tr>
+        <td>${playerRow(p)}${liveSet.has(String(p.id)) ? '<div class="mt8">' + liveBadge('live', r.fetchedAt) + '</div>' : ''}</td>
+        <td class="nowrap small">${esc(p.positionCn || '—')}</td>
+        <td class="nowrap small">${val(p.nationality)}</td>
+        <td class="num small">${val(p.age)}</td>
+        <td class="small">${esc(p.team || '—')}${p.leagueCn ? '<div class="muted">' + esc(p.leagueCn) + '</div>' : ''}</td>
+        <td>${scoreBar(f.total)}
+          <div class="small muted">置信度 ${f.confidence != null ? f.confidence + '%' : '—'}${src('model', '模型计算值')}</div></td>
+        <td><div class="btn-row">
+          <a class="btn ghost sm" href="player.html?id=${esc(p.id)}">档案</a>
+          <button class="btn sm" data-add="${esc(p.id)}" data-name="${esc(p.name)}">加目标</button>
+        </div></td>
+      </tr>`;
+    }).join('');
+
+    tbody.querySelectorAll('[data-add]').forEach(b => b.addEventListener('click', async () => {
+      try {
+        await api.post('/api/targets', { target: { id: b.dataset.add, name: b.dataset.name, level: 'B', stage: '初步接触', note: '' } });
+        b.textContent = '已加入'; b.classList.remove('btn'); b.classList.add('btn', 'gray', 'sm');
+      } catch (e) { alert('加入失败：' + e.message); }
+    }));
+  } catch (e) {
+    tbody.innerHTML = '<tr><td colspan="7"><div class="note">' + esc(e.message) + '</div></td></tr>';
+  }
+}
+
+document.getElementById('searchBtn').addEventListener('click', () => { page = 0; run(); });
+document.getElementById('prevBtn').addEventListener('click', () => { if (page > 0) { page--; run(); } });
+document.getElementById('nextBtn').addEventListener('click', () => { page++; run(); });
+$$('#tagSeg button').forEach(b => b.addEventListener('click', () => {
+  $$('#tagSeg button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on'); tag = b.dataset.t; page = 0; run();
+}));
+
+document.getElementById('simForm').addEventListener('submit', async ev => {
+  ev.preventDefault();
+  const qv = document.getElementById('simQ').value.trim();
+  if (!qv) return;
+  const box = document.getElementById('simResult');
+  box.innerHTML = '<span class="spinner"></span> 查找中…';
+  try {
+    const r = await api.get('/api/players?q=' + q(qv) + '&limit=5&live=1');
+    if (!r.players.length) { box.innerHTML = '<div class="empty">未找到该球员，可尝试英文名</div>'; return; }
+    const base = r.players[0];
+    const s = await api.get('/api/similar?id=' + q(base.id) + '&limit=8');
+    box.innerHTML = `<div class="note blue mb16">基准球员：<b>${esc(base.name)}</b> · ${esc(base.positionCn)} · ${base.age != null ? base.age + '岁' : '年龄未知'} · ${esc(base.team || '—')}</div>
+      <div class="tbl-scroll"><table class="table"><tbody>${s.list.map(p => `
+        <tr><td>${playerRow(p)}</td>
+        <td class="nowrap small">${esc(p.positionCn)}</td>
+        <td class="num small">${val(p.age)}</td>
+        <td>${scoreBar(p.similarity)}</td>
+        <td><a class="btn ghost sm" href="player.html?id=${esc(p.id)}">档案</a></td></tr>`).join('')}
+      </tbody></table></div>
+      <div class="small muted mt8">相似度基于位置、年龄、联赛级别、国籍四项真实字段计算</div>`;
+  } catch (e) { box.innerHTML = '<div class="note">' + esc(e.message) + '</div>'; }
+});
+
+(async () => {
+  P = await loadProfile();
+  document.getElementById('pbText').innerHTML = profileText();
+  await fillLeagues();
+  run();
+})();
+</script>
+</body>
+</html>

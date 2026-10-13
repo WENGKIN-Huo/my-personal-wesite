@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>目标管理 · 球员挖掘系统</title>
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+<div id="nav"></div>
+
+<section class="wrap section">
+  <div class="eyebrow">模块五</div>
+  <h1>转会目标管理与协作</h1>
+  <p class="lede">将候选球员分级为 A（核心目标）/ B（备选）/ C（潜力刮奖），记录跟进阶段与各方意见，全流程留痕。</p>
+</section>
+
+<section class="wrap section tight">
+  <div class="card">
+    <h3>添加目标</h3>
+    <form class="row mt16" id="addForm">
+      <input type="search" id="addQ" placeholder="输入球员姓名，支持全球实时检索" style="flex:1;min-width:240px">
+      <select id="addLevel" style="max-width:150px">
+        <option value="A">A · 核心目标</option>
+        <option value="B" selected>B · 备选方案</option>
+        <option value="C">C · 潜力刮奖</option>
+      </select>
+      <select id="addStage" style="max-width:160px">
+        <option>初步接触</option><option>报价</option><option>谈判</option><option>体检</option><option>签约</option>
+      </select>
+      <input type="text" id="addNote" placeholder="备注（球探 / 教练 / 财务意见）" style="flex:1;min-width:200px">
+      <button class="btn" type="submit">加入</button>
+    </form>
+    <div id="addTip" class="mt8"></div>
+  </div>
+</section>
+
+<section class="wrap section tight">
+  <div class="between mb16">
+    <h3>目标清单 <span class="muted small" id="listTip"></span></h3>
+    <div class="btn-row">
+      <button class="btn ghost sm" id="cmpBtn">对比选中</button>
+      <button class="btn gray sm" id="clearCmp">清除选择</button>
+    </div>
+  </div>
+  <div class="card" style="padding:8px">
+    <div class="tbl-scroll">
+      <table class="table">
+        <thead><tr>
+          <th style="width:36px"></th><th>球员</th><th>级别</th><th>跟进阶段</th>
+          <th style="min-width:130px">适配度</th><th>备注 / 协作留痕</th><th style="width:80px">操作</th>
+        </tr></thead>
+        <tbody id="tbody"><tr><td colspan="7"><div class="empty">加载中…</div></td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section class="wrap section tight" id="cmpSec" style="display:none">
+  <h3>多目标横向对比</h3>
+  <div class="card mt16"><div class="tbl-scroll" id="cmpBox"></div></div>
+</section>
+
+<div id="foot"></div>
+<script src="assets/js/common.js"></script>
+<script>
+renderNav('targets.html');
+const LEVEL_CN = { A: 'A · 核心目标', B: 'B · 备选', C: 'C · 潜力刮奖' };
+let SEL = new Set();
+
+async function load() {
+  const tbody = document.getElementById('tbody');
+  try {
+    const r = await api.get('/api/targets');
+    const list = r.targets || [];
+    document.getElementById('listTip').textContent = `共 ${list.length} 人`;
+    if (!list.length) {
+      tbody.innerHTML = '<tr><td colspan="7"><div class="empty"><h3>目标清单为空</h3><p class="muted">在上方添加，或前往智能挖掘页点击"加目标"</p></div></td></tr>';
+      return;
+    }
+    tbody.innerHTML = list.map(t => {
+      const p = t.player || {}, f = t.fit || {};
+      return `<tr>
+        <td><input type="checkbox" data-sel="${esc(t.id)}" ${SEL.has(t.id) ? 'checked' : ''}></td>
+        <td>${p.id ? playerRow(p) : esc(t.name || t.id)}</td>
+        <td><select class="lv" data-id="${esc(t.id)}" style="max-width:130px">
+          ${Object.keys(LEVEL_CN).map(k => `<option value="${k}" ${t.level === k ? 'selected' : ''}>${LEVEL_CN[k]}</option>`).join('')}
+        </select></td>
+        <td><select class="st" data-id="${esc(t.id)}" style="max-width:120px">
+          ${['初步接触', '报价', '谈判', '体检', '签约'].map(s => `<option ${t.stage === s ? 'selected' : ''}>${s}</option>`).join('')}
+        </select></td>
+        <td>${f.total != null ? scoreBar(f.total) + `<div class="small muted">置信度 ${f.confidence}%</div>` : '<span class="muted small">未配置画像</span>'}</td>
+        <td><input type="text" class="nt" data-id="${esc(t.id)}" value="${esc(t.note || '')}" placeholder="补充评估意见" style="border:none;background:transparent;padding:2px 0">
+          ${t.updatedAt ? `<div class="small muted">更新 ${new Date(t.updatedAt).toLocaleString('zh-CN')}</div>` : ''}</td>
+        <td><button class="btn gray sm" data-del="${esc(t.id)}">移除</button></td>
+      </tr>`;
+    }).join('');
+
+    tbody.querySelectorAll('[data-sel]').forEach(c => c.addEventListener('change', () => {
+      c.checked ? SEL.add(c.dataset.sel) : SEL.delete(c.dataset.sel);
+    }));
+    tbody.querySelectorAll('.lv, .st').forEach(s => s.addEventListener('change', () => {
+      const id = s.dataset.id;
+      const t = list.find(x => x.id === id);
+      api.post('/api/targets', {
+        target: {
+          id, name: (t.player && t.player.name) || t.name,
+          level: tbody.querySelector(`.lv[data-id="${id}"]`).value,
+          stage: tbody.querySelector(`.st[data-id="${id}"]`).value,
+          note: tbody.querySelector(`.nt[data-id="${id}"]`).value
+        }
+      }).then(load);
+    }));
+    tbody.querySelectorAll('.nt').forEach(s => s.addEventListener('change', () => {
+      const id = s.dataset.id;
+      const t = list.find(x => x.id === id);
+      api.post('/api/targets', {
+        target: {
+          id, name: (t.player && t.player.name) || t.name,
+          level: tbody.querySelector(`.lv[data-id="${id}"]`).value,
+          stage: tbody.querySelector(`.st[data-id="${id}"]`).value,
+          note: s.value
+        }
+      }).then(load);
+    }));
+    tbody.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', () => {
+      api.del('/api/targets?id=' + q(b.dataset.del)).then(load);
+    }));
+  } catch (e) {
+    tbody.innerHTML = '<tr><td colspan="7"><div class="note">' + esc(e.message) + '</div></td></tr>';
+  }
+}
+
+document.getElementById('addForm').addEventListener('submit', async ev => {
+  ev.preventDefault();
+  const qv = document.getElementById('addQ').value.trim();
+  if (!qv) return;
+  const tip = document.getElementById('addTip');
+  tip.innerHTML = '<span class="spinner"></span> 检索中…';
+  try {
+    const r = await api.get('/api/players?q=' + q(qv) + '&limit=1');
+    if (!r.players.length) { tip.innerHTML = '<span class="badge err">未找到该球员</span>'; return; }
+    const p = r.players[0];
+    await api.post('/api/targets', {
+      target: {
+        id: p.id, name: p.name,
+        level: document.getElementById('addLevel').value,
+        stage: document.getElementById('addStage').value,
+        note: document.getElementById('addNote').value.trim()
+      }
+    });
+    tip.innerHTML = `<span class="badge ok">已加入 ${esc(p.name)}</span>`;
+    document.getElementById('addQ').value = ''; document.getElementById('addNote').value = '';
+    load();
+  } catch (e) { tip.innerHTML = '<span class="badge err">' + esc(e.message) + '</span>'; }
+});
+
+document.getElementById('cmpBtn').addEventListener('click', async () => {
+  if (SEL.size < 2) { alert('请至少勾选 2 名球员进行对比'); return; }
+  const r = await api.get('/api/targets');
+  const sel = r.targets.filter(t => SEL.has(t.id) && t.player);
+  const box = document.getElementById('cmpBox');
+  const rows = [
+    ['位置', p => esc(p.positionCn)],
+    ['年龄', p => val(p.age, ' 岁')],
+    ['国籍', p => val(p.nationality)],
+    ['俱乐部', p => val(p.team)],
+    ['联赛', p => val(p.leagueCn || p.league)],
+    ['联赛档级', p => p.tier != null ? '第 ' + p.tier + ' 档' : NA],
+    ['国脚身份', p => p.nationalTeam ? '<span class="badge ok">现役国脚</span>' : '<span class="muted">否</span>'],
+    ['签约日期', p => val(p.signedDate)],
+    ['加盟方式', p => val(p.signingFee)]
+  ];
+  box.innerHTML = `<table class="table">
+    <thead><tr><th style="width:120px">对比项</th>${sel.map(t => `<th>${esc(t.player.name)}</th>`).join('')}</tr></thead>
+    <tbody>
+      <tr><th>级别 / 阶段</th>${sel.map(t => `<td>${esc(t.level || '—')} · ${esc(t.stage || '—')}</td>`).join('')}</tr>
+      ${rows.map(([k, fn]) => `<tr><th>${k}</th>${sel.map(t => `<td>${fn(t.player)}</td>`).join('')}</tr>`).join('')}
+      <tr><th>体系适配度${src('model')}</th>${sel.map(t => `<td>${t.fit ? scoreBar(t.fit.total) : '—'}</td>`).join('')}</tr>
+      <tr><th>风险等级</th>${sel.map(t => {
+        const a = t.player.age;
+        const lv = a == null ? ['未知', 'warn'] : a >= 33 ? ['高', 'err'] : a >= 31 ? ['中', 'warn'] : ['低', 'ok'];
+        return `<td><span class="badge ${lv[1]}">${lv[0]}</span></td>`;
+      }).join('')}</tr>
+      <tr><th>身价 / 薪资</th>${sel.map(() => `<td class="muted small">暂无数据（无开放数据源）</td>`).join('')}</tr>
+    </tbody></table>`;
+  document.getElementById('cmpSec').style.display = '';
+  document.getElementById('cmpSec').scrollIntoView({ behavior: 'smooth' });
+});
+document.getElementById('clearCmp').addEventListener('click', () => { SEL.clear(); load(); document.getElementById('cmpSec').style.display = 'none'; });
+
+load();
+</script>
+</body>
+</html>

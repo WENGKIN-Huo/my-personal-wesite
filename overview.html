@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>总览 · 球员挖掘系统</title>
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+<div id="nav"></div>
+
+<section class="wrap section">
+  <div class="eyebrow">面向足球球队经理 / 转会负责人</div>
+  <h1>足球球队经理<br>体育总监快速球员挖掘器</h1>
+  <p class="lede">按你的战术体系找到合适的球员。系统接入公开球员数据库，实时拉取真实球员信息；
+    对拿不到的数据一律留空并标明，不做任何编造。</p>
+
+  <div class="grid g4 mt32" id="statCards">
+    <div class="card"><div class="card-title">本地球员库</div><div class="metric" id="mPlayers">—</div>
+      <div class="metric-note">真实球员记录，检索即入库</div></div>
+    <div class="card"><div class="card-title">覆盖联赛</div><div class="metric" id="mLeagues">—</div>
+      <div class="metric-note">已收录俱乐部所属联赛</div></div>
+    <div class="card"><div class="card-title">收录俱乐部</div><div class="metric" id="mTeams">—</div>
+      <div class="metric-note">全球范围</div></div>
+    <div class="card"><div class="card-title">真实字段覆盖率</div><div class="metric" id="mTruth">—</div>
+      <div class="metric-note"><a href="truth.html">查看逐字段审计 →</a></div></div>
+    <div class="card"><div class="card-title">主数据源</div><div class="metric sm" id="mSrc">TheSportsDB</div>
+      <div class="metric-note" id="mUpdated">—</div></div>
+  </div>
+
+  <div class="card mt24">
+    <h3>快速检索球员</h3>
+    <p class="small muted mt8">输入球员姓名或球队名，系统在本地库中匹配；本地未收录时自动向数据源实时检索并入库。</p>
+    <form class="row mt16" id="quickForm">
+      <input type="search" id="quickQ" placeholder="例如：Vinicius Junior / Real Madrid / 孙兴慜" style="flex:1;min-width:240px">
+      <button class="btn" type="submit">检索</button>
+      <a class="btn ghost" href="scout.html">进入智能挖掘</a>
+    </form>
+    <div id="quickResult" class="mt16"></div>
+  </div>
+</section>
+
+<section class="wrap section">
+  <h2>七大能力模块</h2>
+  <p class="lede">从体系定义到签约落地，覆盖一次转会的完整决策链路。</p>
+  <div class="grid g3 mt24">
+    <a class="card flat" href="tactical.html" style="color:inherit;text-decoration:none">
+      <div class="badge">模块一</div>
+      <h3 class="mt8">球队体系与需求自定义</h3>
+      <p class="small muted mt8">阵型、核心打法、压迫强度、出球偏好形成"战术指纹"；按位置自定义四大维度权重；阵容与预算基线。</p>
+    </a>
+    <a class="card flat" href="scout.html" style="color:inherit;text-decoration:none">
+      <div class="badge">模块二</div>
+      <h3 class="mt8">智能匹配与精准检索</h3>
+      <p class="small muted mt8">位置/年龄/联赛/国籍复合筛选，体系适配度排序，"以人找人"相似球员推荐。</p>
+    </a>
+    <a class="card flat" href="player.html" style="color:inherit;text-decoration:none">
+      <div class="badge">模块三</div>
+      <h3 class="mt8">球员深度评估档案</h3>
+      <p class="small muted mt8">真实数据面板、战术适配专项分析、风险画像与数据缺口清单。</p>
+    </a>
+    <a class="card flat" href="deal.html" style="color:inherit;text-decoration:none">
+      <div class="badge">模块四</div>
+      <h3 class="mt8">转会可行性与谈判辅助</h3>
+      <p class="small muted mt8">转会费区间测算、薪资适配、合同条款要点、历史案例参考。</p>
+    </a>
+    <a class="card flat" href="targets.html" style="color:inherit;text-decoration:none">
+      <div class="badge">模块五</div>
+      <h3 class="mt8">目标管理与团队协作</h3>
+      <p class="small muted mt8">A/B/C 分级、跟进阶段流转、多人协作留痕、多目标横向对比。</p>
+    </a>
+    <a class="card flat" href="cockpit.html" style="color:inherit;text-decoration:none">
+      <div class="badge">模块六 / 七</div>
+      <h3 class="mt8">决策驾驶舱与动态监控</h3>
+      <p class="small muted mt8">真实球队阵容缺口热力图、预算仪表盘、转会窗节点提醒、市场机会预警。</p>
+    </a>
+    <a class="card flat" href="truth.html" style="color:inherit;text-decoration:none">
+      <div class="badge">数据治理</div>
+      <h3 class="mt8">数据真实性审计</h3>
+      <p class="small muted mt8">逐字段覆盖率可视化、单球员溯源到来源链接、明确列出拿不到的数据及处理方式。</p>
+    </a>
+  </div>
+</section>
+
+<section class="wrap section">
+  <h2>数据诚信说明</h2>
+  <div class="grid g2 mt16">
+    <div class="note">
+      <b>真实数据</b>：姓名、国籍、出生日期、位置、所属俱乐部、联赛、球衣号、签约日期、转会费备注等，
+      均由公开数据源实时返回并标注来源。
+    </div>
+    <div class="note blue">
+      <b>模型计算</b>：体系适配度由系统根据真实字段（位置契合、联赛级别、年龄曲线、战术风格）加权计算，
+      属模型推算值，界面上以橙色标记区分。
+    </div>
+    <div class="note gray">
+      <b>明确缺失</b>：球员身价、薪资、合同剩余年限、伤病记录目前无开放数据源（Transfermarkt 无公开接口且有反爬校验），
+      系统显示"暂无数据"，<b>不会用估算值冒充实测值</b>。接入商业数据源后自动补齐。
+    </div>
+    <div class="note gray">
+      <b>全球覆盖</b>：支持按球员姓名 / 俱乐部名全球检索，命中后自动写入本地库；配置数据源密钥后可批量导入全部联赛。
+    </div>
+  </div>
+</section>
+
+<div id="foot"></div>
+<script src="assets/js/common.js"></script>
+<script>
+renderNav('overview.html');
+(async () => {
+  try {
+    const h = await api.get('/api/health');
+    document.getElementById('mPlayers').textContent = h.players.toLocaleString();
+    document.getElementById('mLeagues').textContent = h.leagues || '—';
+    document.getElementById('mTeams').textContent = h.teams.toLocaleString();
+    document.getElementById('mUpdated').textContent = h.lastIngest
+      ? '最近建库 ' + new Date(h.lastIngest).toLocaleString('zh-CN')
+      : (h.indexUpdatedAt ? '索引更新 ' + new Date(h.indexUpdatedAt).toLocaleString('zh-CN') : '尚未建库');
+
+    const t = await api.get('/api/truth');
+    document.getElementById('mTruth').textContent = t.report.avgRealCoverage + '%';
+  } catch (e) {
+    document.getElementById('mPlayers').textContent = '离线';
+  }
+})();
+
+document.getElementById('quickForm').addEventListener('submit', async (ev) => {
+  ev.preventDefault();
+  const qv = document.getElementById('quickQ').value.trim();
+  if (!qv) return;
+  const box = document.getElementById('quickResult');
+  box.innerHTML = '<span class="spinner"></span> 检索中…';
+  try {
+    const r = await api.get('/api/players?q=' + q(qv) + '&limit=8');
+    if (!r.players.length) { box.innerHTML = '<div class="empty"><h3>未找到匹配球员</h3><p class="muted">可尝试英文名，或前往智能挖掘页按条件筛选</p></div>'; return; }
+    box.innerHTML = '<div class="card flat"><table class="table"><tbody>' + r.players.map(p =>
+      `<tr><td>${playerRow(p)}</td>
+       <td class="nowrap small">${val(p.nationality)}</td>
+       <td class="nowrap small">${val(p.age, ' 岁')}</td>
+       <td class="nowrap small">${val(p.leagueCn || p.league)}</td></tr>`).join('') +
+      '</tbody></table></div><div class="small muted mt8">共 ' + r.total + ' 人匹配' +
+      (r.liveAdded ? `（本次从数据源实时补录 ${r.liveAdded} 人）` : '') + '</div>';
+  } catch (e) { box.innerHTML = '<div class="note">' + esc(e.message) + '</div>'; }
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>转会测算 · 球员挖掘系统</title>
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+<div id="nav"></div>
+
+<section class="wrap section">
+  <div class="eyebrow">模块四</div>
+  <h1>转会可行性与谈判辅助</h1>
+  <p class="lede">转会费与薪资测算依赖球员身价、薪资、合同年限等字段。这些数据目前没有开放数据源，
+    系统因此<b>不使用任何虚构数值</b>：测算结果以区间模型呈现并标注为估算，或由你手动录入真实谈判信息参与计算。</p>
+</section>
+
+<section class="wrap section tight">
+  <div class="card">
+    <h3>选择测算对象</h3>
+    <form class="row mt16" id="pickForm">
+      <input type="search" id="pickQ" placeholder="输入球员姓名" style="flex:1;min-width:240px">
+      <button class="btn" type="submit">载入</button>
+    </form>
+    <div id="pickBox" class="mt16"></div>
+  </div>
+</section>
+
+<section class="wrap section tight" id="result" style="display:none">
+  <div class="grid g2" style="align-items:start">
+    <div class="card">
+      <h3>转会费区间测算 <span class="badge warn">模型估算</span></h3>
+      <div id="feeBase" class="small muted mt8"></div>
+      <div class="row mt16" style="gap:28px">
+        <div><div class="metric" id="feeLow">—</div><div class="metric-note">下限（万欧）</div></div>
+        <div><div class="metric" id="feeMid">—</div><div class="metric-note">中枢（万欧）</div></div>
+        <div><div class="metric" id="feeHigh">—</div><div class="metric-note">上限（万欧）</div></div>
+      </div>
+      <table class="table mt16" id="feeTable"></table>
+      <div class="note mt16">
+        估算公式基于<b>真实字段</b>（联赛级别、年龄、位置、国脚身份）与可调整系数，结果为量级参考，
+        <b>不等同于市场成交价</b>。接入 Transfermarkt / API-Football 商业数据后可替换为真实成交与身价数据。
+      </div>
+      <div class="grid g2 mt16">
+        <div class="field"><label>年龄系数（可覆写）</label><input type="number" id="kAge" step="0.05"></div>
+        <div class="field"><label>位置系数（可覆写）</label><input type="number" id="kPos" step="0.05"></div>
+        <div class="field"><label>国脚系数（可覆写）</label><input type="number" id="kIntl" step="0.05"></div>
+        <div class="field"><label>市场热度系数</label><input type="number" id="kHeat" step="0.05" value="1.00"></div>
+      </div>
+      <button class="btn mt16" id="recalc">重新测算</button>
+    </div>
+
+    <div>
+      <div class="card">
+        <h3>薪资适配测算</h3>
+        <div class="note gray mt8">球员当前薪资与预期薪资无开放数据源。请手动录入谈判中获得的真实薪资信息参与测算；
+          不录入时系统不会给出任何薪资数值。</div>
+        <div class="grid g2 mt16">
+          <div class="field"><label>当前年薪（万欧）</label><input type="number" id="wageNow" placeholder="未录入"></div>
+          <div class="field"><label>预期年薪（万欧）</label><input type="number" id="wageWant" placeholder="未录入"></div>
+        </div>
+        <div id="wageOut" class="mt16"></div>
+      </div>
+
+      <div class="card mt16">
+        <h3>合同条款与关键节点</h3>
+        <div class="note gray mt8">合同解约金、到期日、续约与买断条款同样无开放数据源，请录入尽调获得的真实条款，系统据此生成节点清单。</div>
+        <div class="grid g2 mt16">
+          <div class="field"><label>合同到期日</label><input type="date" id="cEnd"></div>
+          <div class="field"><label>解约金（万欧）</label><input type="number" id="cClause" placeholder="未录入"></div>
+          <div class="field"><label>续约选项</label><select id="cOption">
+            <option value="">未知</option><option value="有（俱乐部侧）">有（俱乐部侧）</option>
+            <option value="有（球员侧）">有（球员侧）</option><option value="无">无</option></select></div>
+          <div class="field"><label>租借买断条款</label><select id="cLoan">
+            <option value="">未知</option><option value="含强制买断">含强制买断</option>
+            <option value="含选择买断">含选择买断</option><option value="无">无</option></select></div>
+          <div class="field"><label>转会分成（%）</label><input type="number" id="cSell" placeholder="例如 15"></div>
+          <div class="field"><label>报价截止时间</label><input type="date" id="cDeadline"></div>
+        </div>
+        <button class="btn mt16" id="genClause">生成节点清单</button>
+        <div id="clauseOut" class="mt16"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card mt16">
+    <h3>历史转会案例参考</h3>
+    <div class="note gray mt8">成交案例库需商业数据源。此处支持手动录入你掌握的<b>真实成交案例</b>，
+      系统据此统计同位置、相近年龄的中位成交价作为谈判参照。不录入则不生成参考值。</div>
+    <div class="row mt16">
+      <input type="text" id="csName" placeholder="球员姓名" style="max-width:180px">
+      <input type="number" id="csFee" placeholder="转会费（万欧）" style="max-width:150px">
+      <input type="number" id="csAge" placeholder="年龄" style="max-width:110px">
+      <select id="csPos" style="max-width:130px">
+        <option value="">位置</option><option>GK</option><option>CB</option><option>LB</option><option>RB</option>
+        <option>DM</option><option>CM</option><option>AM</option><option>LW</option><option>RW</option><option>SS</option><option>ST</option>
+      </select>
+      <button class="btn" id="csAdd">添加案例</button>
+    </div>
+    <div id="csOut" class="mt16"></div>
+  </div>
+</section>
+
+<div id="foot"></div>
+<script src="assets/js/common.js"></script>
+<script>
+renderNav('deal.html');
+
+let CUR = null, P = Object.assign({}, DEFAULT_PROFILE);
+let CASES = [];
+
+const TIER_BASE = { 1: 2500, 2: 900, 3: 300, 4: 120, 5: 50 };
+const POS_K = { ST: 1.25, SS: 1.15, AM: 1.20, LW: 1.20, RW: 1.20, CM: 1.00, DM: 1.00, CB: 0.95, LB: 0.90, RB: 0.90, GK: 0.70, UNK: 0.80 };
+
+function ageK(a) {
+  if (a == null) return 0.8;
+  if (a <= 19) return 1.05; if (a <= 21) return 1.15;
+  if (a <= 23) return 1.12; if (a <= 25) return 1.10;
+  if (a <= 27) return 1.05; if (a <= 29) return 1.00;
+  if (a <= 31) return 0.60; if (a <= 33) return 0.32;
+  return 0.18;
+}
+const money = v => v == null ? '—' : Math.round(v).toLocaleString();
+
+function calcFee() {
+  const p = CUR;
+  const tier = p.tier || 3;
+  const base = TIER_BASE[tier] || 300;
+  const kA = Number(document.getElementById('kAge').value) || ageK(p.age);
+  const kP = Number(document.getElementById('kPos').value) || (POS_K[p.position] || 0.8);
+  const kI = Number(document.getElementById('kIntl').value) || (p.nationalTeam ? 1.15 : 1.0);
+  const kH = Number(document.getElementById('kHeat').value) || 1;
+  const mid = base * kA * kP * kI * kH;
+
+  document.getElementById('feeLow').textContent = money(mid * 0.7);
+  document.getElementById('feeMid').textContent = money(mid);
+  document.getElementById('feeHigh').textContent = money(mid * 1.35);
+
+  document.getElementById('feeBase').innerHTML =
+    `基准球员：<b>${esc(p.name)}</b> · ${esc(p.positionCn)} · ${p.age != null ? p.age + '岁' : '年龄未知'} · ${esc(p.leagueCn || p.league || '联赛未知')}`;
+
+  document.getElementById('feeTable').innerHTML = `
+    <tr><th>因子</th><th>取值</th><th>说明</th></tr>
+    <tr><td>联赛级别基准</td><td class="num">${money(base)} 万欧</td><td class="small muted">${esc(p.leagueCn || p.league || '—')}（第 ${tier} 档）${src('real', '来自数据源')}</td></tr>
+    <tr><td>年龄系数</td><td class="num">${kA.toFixed(2)}</td><td class="small muted">${p.age != null ? p.age + ' 岁' : '年龄未知，按保守值 0.80'} ${src('model')}</td></tr>
+    <tr><td>位置系数</td><td class="num">${kP.toFixed(2)}</td><td class="small muted">${esc(p.positionCn)} ${src('model')}</td></tr>
+    <tr><td>国脚系数</td><td class="num">${kI.toFixed(2)}</td><td class="small muted">${p.nationalTeam ? '现役国脚' : '非现役国脚'} ${src('real')}</td></tr>
+    <tr><td>市场热度</td><td class="num">${kH.toFixed(2)}</td><td class="small muted">手动设定</td></tr>`;
+}
+
+function calcWage() {
+  const now = Number(document.getElementById('wageNow').value) || null;
+  const want = Number(document.getElementById('wageWant').value) || null;
+  const cap = Number(P.wageCap) || 0;
+  const out = document.getElementById('wageOut');
+  if (!now && !want) { out.innerHTML = '<div class="small muted">未录入薪资信息，不生成测算结果。</div>'; return; }
+  const w = want || now;
+  const ratio = cap ? (w / cap * 100) : null;
+  const cls = ratio == null ? '' : (ratio > 25 ? 'err' : ratio > 15 ? 'warn' : 'ok');
+  out.innerHTML = `
+    <table class="table">
+      <tr><th style="width:140px">当前年薪</th><td>${now ? money(now) + ' 万欧' : NA}</td></tr>
+      <tr><th>预期年薪</th><td>${want ? money(want) + ' 万欧' : NA}</td></tr>
+      <tr><th>球队工资帽</th><td>${cap ? money(cap) + ' 万欧' : NA}</td></tr>
+      <tr><th>占工资帽比例</th><td>${ratio != null ? `<b>${ratio.toFixed(1)}%</b> <span class="badge ${cls}">${ratio > 25 ? '偏高' : ratio > 15 ? '需评估' : '可控'}</span>` : NA}</td></tr>
+      <tr><th>建议区间</th><td>${cap ? `${money(cap * 0.05)} – ${money(cap * 0.15)} 万欧（按工资帽 5%–15%）${src('model', '模型建议')}` : NA}</td></tr>
+    </table>
+    <div class="small muted mt8">建议区间为通用薪资结构经验值，需结合队内同位置薪资分布调整。</div>`;
+}
+
+function genClause() {
+  const o = document.getElementById('clauseOut');
+  const end = document.getElementById('cEnd').value;
+  const clause = Number(document.getElementById('cClause').value) || null;
+  const opt = document.getElementById('cOption').value;
+  const loan = document.getElementById('cLoan').value;
+  const sell = Number(document.getElementById('cSell').value) || null;
+  const dl = document.getElementById('cDeadline').value;
+  const items = [];
+  if (end) {
+    const d = new Date(end), now = new Date();
+    const months = Math.round((d - now) / (30 * 24 * 3600e3));
+    items.push([`合同到期 ${end}`, months <= 0 ? '已到期' : `剩余 ${months} 个月` + (months <= 12 ? '（进入合同年，议价空间扩大）' : ''),
+      months <= 12 ? 'warn' : 'ok']);
+  }
+  if (clause) items.push([`解约金 ${money(clause)} 万欧`, '触发即进入直接谈判阶段', 'info']);
+  if (opt) items.push([`续约选项：${opt}`, opt.includes('俱乐部') ? '我方可主动延长，降低竞价压力' : '球员侧可激活，需提前沟通', opt.includes('俱乐部') ? 'ok' : 'warn']);
+  if (loan) items.push([`租借买断：${loan}`, loan.includes('强制') ? '需注意触发条件与财务义务' : '可争取先租后买降低风险', 'info']);
+  if (sell) items.push([`转会分成 ${sell}%`, '卖方将分得二次转会收益，可作为压价筹码', 'info']);
+  if (dl) items.push([`报价截止 ${dl}`, '需在此前完成报价与条款交换', 'warn']);
+  o.innerHTML = items.length
+    ? `<table class="table"><tbody>${items.map(([a, b, c]) =>
+        `<tr><td style="width:200px"><b>${esc(a)}</b></td><td class="small">${esc(b)}</td>
+         <td style="width:80px"><span class="badge ${c}">${c === 'warn' ? '需关注' : c === 'ok' ? '有利' : '提示'}</span></td></tr>`).join('')}</tbody></table>`
+    : '<div class="small muted">未录入任何条款信息。</div>';
+}
+
+function renderCases() {
+  const box = document.getElementById('csOut');
+  if (!CASES.length) { box.innerHTML = '<div class="small muted">暂无案例。</div>'; return; }
+  const fees = CASES.map(c => c.fee).sort((a, b) => a - b);
+  const med = fees.length % 2 ? fees[(fees.length - 1) / 2] : (fees[fees.length / 2 - 1] + fees[fees.length / 2]) / 2;
+  box.innerHTML = `<table class="table"><thead><tr><th>球员</th><th>位置</th><th>年龄</th><th>转会费（万欧）</th><th></th></tr></thead>
+    <tbody>${CASES.map((c, i) => `<tr><td>${esc(c.name)}</td><td>${esc(c.pos || '—')}</td><td>${esc(c.age || '—')}</td>
+      <td class="num">${money(c.fee)}</td><td><button class="btn gray sm" data-rm="${i}">移除</button></td></tr>`).join('')}</tbody></table>
+    <div class="note blue mt16">录入案例中位成交价：<b>${money(med)} 万欧</b>（共 ${CASES.length} 例，用于谈判参照）</div>`;
+  box.querySelectorAll('[data-rm]').forEach(b => b.addEventListener('click', () => {
+    CASES.splice(Number(b.dataset.rm), 1); renderCases();
+  }));
+}
+
+document.getElementById('pickForm').addEventListener('submit', async ev => {
+  ev.preventDefault();
+  const qv = document.getElementById('pickQ').value.trim();
+  if (!qv) return;
+  const box = document.getElementById('pickBox');
+  box.innerHTML = '<span class="spinner"></span> 载入中…';
+  try {
+    const r = await api.get('/api/players?q=' + q(qv) + '&limit=1');
+    if (!r.players.length) { box.innerHTML = '<div class="note">未找到该球员</div>'; return; }
+    CUR = r.players[0];
+    box.innerHTML = `<div class="note blue">已载入：<b>${esc(CUR.name)}</b> · ${esc(CUR.positionCn)} · ${CUR.age != null ? CUR.age + '岁' : '年龄未知'} · ${esc(CUR.team || '—')} · ${esc(CUR.leagueCn || CUR.league || '—')}</div>`;
+    document.getElementById('result').style.display = '';
+    document.getElementById('kAge').value = ageK(CUR.age).toFixed(2);
+    document.getElementById('kPos').value = (POS_K[CUR.position] || 0.8).toFixed(2);
+    document.getElementById('kIntl').value = (CUR.nationalTeam ? 1.15 : 1.0).toFixed(2);
+    calcFee(); calcWage();
+  } catch (e) { box.innerHTML = '<div class="note">' + esc(e.message) + '</div>'; }
+});
+
+document.getElementById('recalc').addEventListener('click', () => { if (CUR) calcFee(); });
+['wageNow', 'wageWant'].forEach(id => document.getElementById(id).addEventListener('input', calcWage));
+document.getElementById('genClause').addEventListener('click', genClause);
+document.getElementById('csAdd').addEventListener('click', () => {
+  const name = document.getElementById('csName').value.trim();
+  const fee = Number(document.getElementById('csFee').value);
+  if (!name || !fee) { alert('请填写球员姓名与转会费'); return; }
+  CASES.push({ name, fee, age: Number(document.getElementById('csAge').value) || null, pos: document.getElementById('csPos').value });
+  document.getElementById('csName').value = ''; document.getElementById('csFee').value = '';
+  document.getElementById('csAge').value = ''; document.getElementById('csPos').value = '';
+  renderCases();
+});
+
+(async () => {
+  P = await loadProfile();
+  const id = new URLSearchParams(location.search).get('id');
+  if (id) {
+    try {
+      const r = await api.get('/api/player?id=' + q(id));
+      CUR = r.player;
+      document.getElementById('pickBox').innerHTML = `<div class="note blue">已载入：<b>${esc(CUR.name)}</b> · ${esc(CUR.positionCn)} · ${CUR.age != null ? CUR.age + '岁' : '年龄未知'}</div>`;
+      document.getElementById('result').style.display = '';
+      document.getElementById('kAge').value = ageK(CUR.age).toFixed(2);
+      document.getElementById('kPos').value = (POS_K[CUR.position] || 0.8).toFixed(2);
+      document.getElementById('kIntl').value = (CUR.nationalTeam ? 1.15 : 1.0).toFixed(2);
+      calcFee(); calcWage();
+    } catch (e) { }
+  }
+})();
+</script>
+</body>
+</html>

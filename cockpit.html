@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>决策驾驶舱 · 球员挖掘系统</title>
+<link rel="stylesheet" href="assets/css/style.css">
+<style>
+.heat { display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:10px; }
+.heat .cell { border-radius:14px; padding:12px; text-align:center; border:1px solid var(--line-soft); }
+.heat .cell .pos { font-weight:600; font-size:14px; }
+.heat .cell .rate { font-size:22px; font-weight:600; margin:4px 0; }
+.heat .cell .cnt { font-size:12px; color:var(--muted); }
+.heat .cell.weak { border-color:var(--red); box-shadow:0 0 0 2px var(--red-soft); }
+.heat .cell.mid { border-color:var(--orange); }
+</style>
+</head>
+<body>
+<div id="nav"></div>
+
+<section class="wrap section">
+  <div class="eyebrow">模块六 / 七</div>
+  <h1>决策驾驶舱与动态监控</h1>
+  <p class="lede">阵容厚度、预算占用、关键节点与市场机会一屏掌握。所有球员数据来自公开数据源并标注抓取时间，
+    可手动触发实时刷新。</p>
+</section>
+
+<section class="wrap section tight">
+  <div class="grid g4">
+    <div class="card"><div class="card-title">球员库容量</div><div class="metric" id="kPlayers">—</div>
+      <div class="metric-note" id="kUpdated">—</div></div>
+    <div class="card"><div class="card-title">转会预算剩余</div><div class="metric" id="kBudget">—</div>
+      <div class="metric-note" id="kBudgetNote">—</div></div>
+    <div class="card"><div class="card-title">在跟目标</div><div class="metric" id="kTargets">—</div>
+      <div class="metric-note" id="kTargetsNote">—</div></div>
+    <div class="card"><div class="card-title">最近节点倒计时</div><div class="metric sm" id="kDeadline">—</div>
+      <div class="metric-note" id="kDeadlineNote">未设置节点</div></div>
+  </div>
+</section>
+
+<section class="wrap section tight">
+  <div class="card">
+    <div class="between mb8">
+      <h3>真实阵容缺口分析</h3>
+      <div class="row">
+        <select id="gapFormation" style="max-width:140px"></select>
+        <select id="gapStyle" style="max-width:160px"></select>
+        <button class="btn gray sm" id="gapGo">重新核算</button>
+        <a class="btn ghost sm" href="tactical.html">换球队 / 改体系</a>
+      </div>
+    </div>
+    <div id="gapHead" class="small muted"></div>
+    <div id="gapBody" class="mt16"><div class="empty"><span class="spinner"></span> 正在核算…</div></div>
+  </div>
+</section>
+
+<section class="wrap section tight">
+  <div class="card">
+    <div class="between mb8">
+      <h3>自建阵容补强热力图</h3>
+      <span class="small muted">备选：当你方阵容未公开收录时，可手动录入</span>
+    </div>
+    <div class="note gray">若上方已载入真实球队，请以真实分析为准。此表数据由你方录入，仅本地保存，不上传。</div>
+    <div class="heat mt16" id="heat"></div>
+    <div id="weakTip" class="mt16"></div>
+  </div>
+</section>
+
+<section class="wrap section tight">
+  <div class="grid g2" style="align-items:start">
+    <div class="card">
+      <h3>转会预算仪表盘</h3>
+      <div class="mt16">
+        <div class="between small"><span>已分配 / 预算上限</span><span id="bText">—</span></div>
+        <div class="bar mt8" style="height:10px"><i id="bBar" style="width:0%"></i></div>
+      </div>
+      <table class="table mt16" id="bTable"></table>
+      <div class="note mt16">已分配金额为目标球员的<b>模型估算转会费</b>（非实际成交价）。
+        接入真实身价数据源后可替换为实测值。</div>
+    </div>
+
+    <div class="card">
+      <h3>转会窗节点提醒</h3>
+      <div class="row mt16">
+        <input type="text" id="ndName" placeholder="节点名称，如：注册截止" style="flex:1;min-width:150px">
+        <input type="date" id="ndDate">
+        <button class="btn" id="ndAdd">添加</button>
+      </div>
+      <div id="ndList" class="mt16"></div>
+    </div>
+  </div>
+</section>
+
+<section class="wrap section tight">
+  <div class="card">
+    <div class="between mb8">
+      <h3>市场机会预警</h3>
+      <span class="small muted">基于库中真实数据筛选，按体系适配度排序</span>
+    </div>
+    <div class="row mb16">
+      <div class="seg" id="oppSeg">
+        <button data-t="young" class="on">潜力新星 ≤21</button>
+        <button data-t="lowtier">低级别联赛遗珠</button>
+        <button data-t="prime">当打之年 27-31</button>
+      </div>
+      <button class="btn gray sm" id="oppGo">筛选</button>
+    </div>
+    <div class="tbl-scroll"><table class="table">
+      <thead><tr><th>球员</th><th>位置</th><th>年龄</th><th>俱乐部 / 联赛</th><th style="min-width:130px">适配度</th><th></th></tr></thead>
+      <tbody id="oppBody"><tr><td colspan="6"><div class="empty">点击"筛选"查看</div></td></tr></tbody>
+    </table></div>
+  </div>
+</section>
+
+<section class="wrap section tight">
+  <div class="card">
+    <div class="between mb8">
+      <h3>目标动态监控</h3>
+      <span class="small muted">可对任意目标触发数据源实时刷新，核对最新信息</span>
+    </div>
+    <div class="tbl-scroll"><table class="table">
+      <thead><tr><th>球员</th><th>级别</th><th>阶段</th><th>数据抓取时间</th><th style="width:100px">操作</th></tr></thead>
+      <tbody id="monBody"><tr><td colspan="5"><div class="empty">加载中…</div></td></tr></tbody>
+    </table></div>
+  </div>
+</section>
+
+<div id="foot"></div>
+<script src="assets/js/common.js"></script>
+<script>
+renderNav('cockpit.html');
+
+const POSITIONS = [['GK','门将'],['CB','中后卫'],['LB','左后卫'],['RB','右后卫'],['FB','边后卫'],['DM','后腰'],
+  ['CM','中场'],['AM','前腰'],['LW','左边锋'],['RW','右边锋'],['W','边锋'],['ST','中锋']];
+const TIER_BASE = { 1: 2500, 2: 900, 3: 300, 4: 120, 5: 50 };
+const POS_K = { ST:1.25, SS:1.15, AM:1.20, LW:1.20, RW:1.20, CM:1.0, DM:1.0, CB:0.95, LB:0.9, RB:0.9, GK:0.7, UNK:0.8 };
+function ageK(a){ if(a==null)return .8; if(a<=21)return 1.15; if(a<=25)return 1.10; if(a<=29)return 1.0; if(a<=31)return .6; return .25; }
+const estFee = p => (TIER_BASE[p.tier || 3] || 300) * ageK(p.age) * (POS_K[p.position] || .8) * (p.nationalTeam ? 1.15 : 1);
+const money = v => v == null ? '—' : Math.round(v).toLocaleString();
+
+let P = Object.assign({}, DEFAULT_PROFILE);
+let NODES = [], oppTag = 'young';
+
+/* ---------- 阵容热力图 ---------- */
+function loadSquad() { try { return JSON.parse(localStorage.getItem('squad') || '{}'); } catch (e) { return {}; } }
+function saveSquad(s) { localStorage.setItem('squad', JSON.stringify(s)); }
+
+function renderHeat() {
+  const sq = loadSquad();
+  document.getElementById('heat').innerHTML = POSITIONS.map(([k, cn]) => {
+    const c = sq[k] || { count: '', rate: 3 };
+    const rate = Number(c.rate) || 3, cnt = Number(c.count) || 0;
+    const weak = cnt < 2 || rate <= 2;
+    const mid = cnt === 2 || rate === 3;
+    const bg = ['#f0f0f5', '#ffe9ec', '#fdf1e0', '#f3f3f7', '#e8f2fe', '#e3f5e8'][Math.max(0, Math.min(5, rate))];
+    return `<div class="cell ${weak ? 'weak' : mid ? 'mid' : ''}" style="background:${bg}">
+      <div class="pos">${cn}</div>
+      <div class="rate">${rate}<span style="font-size:12px;color:var(--muted)">/5</span></div>
+      <div class="cnt">现有 ${cnt} 人</div>
+      <div class="mt8"><input type="number" min="0" max="9" value="${c.count}" data-c="${k}" placeholder="人数"
+        style="padding:4px 6px;font-size:12px;text-align:center"></div>
+      <div class="mt8"><select data-r="${k}" style="padding:4px 6px;font-size:12px">
+        ${[1,2,3,4,5].map(v => `<option value="${v}" ${rate===v?'selected':''}>实力 ${v}</option>`).join('')}
+      </select></div>
+    </div>`;
+  }).join('');
+
+  document.querySelectorAll('#heat [data-c]').forEach(i => i.addEventListener('change', () => {
+    const s = loadSquad(); s[i.dataset.c] = Object.assign({}, s[i.dataset.c], { count: i.value, rate: (s[i.dataset.c]||{}).rate || 3 });
+    saveSquad(s); renderHeat();
+  }));
+  document.querySelectorAll('#heat [data-r]').forEach(i => i.addEventListener('change', () => {
+    const s = loadSquad(); s[i.dataset.r] = Object.assign({}, s[i.dataset.r], { rate: Number(i.value), count: (s[i.dataset.r]||{}).count || '' });
+    saveSquad(s); renderHeat();
+  }));
+
+  const sq2 = loadSquad();
+  const weak = POSITIONS.filter(([k]) => {
+    const c = sq2[k] || {}; return (Number(c.count) || 0) < 2 || (Number(c.rate) || 3) <= 2;
+  }).map(([k, cn]) => cn);
+  document.getElementById('weakTip').innerHTML = weak.length
+    ? `<div class="note"><b>急需补强位置</b>：${esc(weak.join('、'))}。建议将这些位置设为体系配置中的目标位置。</div>`
+    : '<div class="small muted">未发现明显薄弱位置（按当前录入判断）。</div>';
+}
+
+/* ---------- 真实阵容缺口 ---------- */
+let CAT = null;
+async function loadGap() {
+  const box = document.getElementById('gapBody');
+  const head = document.getElementById('gapHead');
+  const f = document.getElementById('gapFormation').value;
+  const s = document.getElementById('gapStyle').value;
+  box.innerHTML = '<div class="empty"><span class="spinner"></span> 正在核算…</div>';
+  try {
+    const r = await api.get(`/api/squad-gap?formation=${encodeURIComponent(f)}&style=${encodeURIComponent(s)}`);
+    const g = r.gap;
+    head.innerHTML = `<b>${esc(r.club.teamName || '—')}</b>　·　${esc(r.club.league || '联赛未知')}　·　
+      在册真实球员 <b>${r.squadSize}</b> 人　·　阵型 <b>${esc(g.formationCn)}</b>　·　风格 <b>${esc(g.styleCn)}</b>
+      ${g.avgAge != null ? '　·　平均年龄 <b>' + g.avgAge + '</b> 岁' : ''}`;
+
+    const cell = s2 => {
+      const cls = s2.status === 'empty' ? 'err' : s2.status === 'thin' ? 'warn' : s2.status === 'aging' ? 'warn' : 'ok';
+      const txt = s2.status === 'empty' ? '缺人' : s2.status === 'thin' ? '偏薄' : s2.status === 'aging' ? '老化' : '齐备';
+      const names = s2.holders.map(h => `<div class="small">${esc(h.name || '—')}${h.age != null ? ' · ' + h.age + '岁' : ''}
+        <span class="muted">(${h.score != null ? h.score : '—'})</span></div>`).join('') || '<div class="small muted">无在册球员</div>';
+      return `<div class="cell ${s2.status === 'empty' ? 'weak' : s2.status === 'aging' || s2.status === 'thin' ? 'mid' : ''}"
+        style="background:${s2.status === 'empty' ? '#ffe9ec' : s2.status === 'thin' || s2.status === 'aging' ? '#fdf1e0' : '#e3f5e8'}">
+        <div class="pos">${esc(s2.posCn)}</div>
+        <div class="small muted">${esc(s2.role)}</div>
+        <div class="rate">${s2.have}<span style="font-size:12px;color:var(--muted)">/${s2.need}</span></div>
+        <div class="cnt">${s2.avgAge != null ? '均龄 ' + s2.avgAge : '年龄未知'}</div>
+        <div class="mt8"><span class="badge ${cls}">${txt}</span></div>
+        <div class="mt8">${names}</div>
+      </div>`;
+    };
+    box.innerHTML = `<div class="heat">${g.slots.map(cell).join('')}</div>`;
+
+    const tip = document.getElementById('weakTip');
+    if (g.dataNote) {
+      box.insertAdjacentHTML('beforeend', `<div class="note mt16">${esc(g.dataNote)}</div>`);
+    }
+    if (g.gaps.length) {
+      box.insertAdjacentHTML('beforeend', `<div class="note mt16"><b>需处理 ${g.gaps.length} 项缺口</b><br>· ` + g.gaps.map(esc).join('<br>· ') + `</div>`);
+    } else {
+      box.insertAdjacentHTML('beforeend', '<div class="note blue mt16">✅ 当前阵型下所有位置均有真实在册球员覆盖。</div>');
+    }
+    if (!r.valid.ok) {
+      box.insertAdjacentHTML('beforeend', `<div class="note mt12">⚠ 体系配置冲突：<br>· ` + r.valid.issues.map(esc).join('<br>· ') + `</div>`);
+    }
+  } catch (e) {
+    head.textContent = '';
+    box.innerHTML = `<div class="empty"><h3>尚未选择球队</h3>
+      <p class="muted">${esc(e.message || '')}</p>
+      <a class="btn mt16" href="tactical.html">前往选择一支真实俱乐部</a></div>`;
+  }
+}
+
+/* ---------- 预算 ---------- */
+async function renderBudget() {
+  const r = await api.get('/api/targets');
+  const list = (r.targets || []).filter(t => t.player && (t.level === 'A' || t.level === 'B'));
+  const alloc = list.reduce((a, t) => a + estFee(t.player), 0);
+  const cap = Number(P.budget) || 0;
+  const pct = cap ? Math.min(100, alloc / cap * 100) : 0;
+  document.getElementById('bText').textContent = `${money(alloc)} / ${money(cap)} 万欧`;
+  const bar = document.getElementById('bBar');
+  bar.style.width = pct + '%';
+  bar.style.background = pct > 100 ? 'var(--red)' : pct > 80 ? 'var(--orange)' : 'var(--blue)';
+  document.getElementById('kBudget').textContent = money(cap - alloc);
+  document.getElementById('kBudgetNote').innerHTML = alloc > cap
+    ? '<span class="badge err">已超预算</span>' : (pct > 80 ? '<span class="badge warn">接近上限</span>' : '预算充足');
+  document.getElementById('bTable').innerHTML = list.length
+    ? `<tr><th>目标</th><th>级别</th><th>位置</th><th>估算转会费（万欧）</th></tr>` +
+      list.map(t => `<tr><td>${esc(t.player.name)}</td><td>${esc(t.level)}</td><td>${esc(t.player.positionCn)}</td>
+        <td class="num">${money(estFee(t.player))} ${src('model')}</td></tr>`).join('')
+    : '<tr><td colspan="4" class="muted">尚无 A / B 级目标</td></tr>';
+}
+
+/* ---------- 节点 ---------- */
+function loadNodes() { try { return JSON.parse(localStorage.getItem('nodes') || '[]'); } catch (e) { return []; } }
+function renderNodes() {
+  NODES = loadNodes();
+  const box = document.getElementById('ndList');
+  const now = new Date();
+  box.innerHTML = NODES.length ? `<table class="table"><tbody>${NODES.map((n, i) => {
+    const d = new Date(n.date + 'T00:00:00');
+    const days = Math.ceil((d - now) / 86400000);
+    const cls = days < 0 ? 'err' : days <= 7 ? 'err' : days <= 30 ? 'warn' : 'ok';
+    return `<tr><td><b>${esc(n.name)}</b></td><td class="small">${esc(n.date)}</td>
+      <td><span class="badge ${cls}">${days < 0 ? '已过期' : '剩 ' + days + ' 天'}</span></td>
+      <td style="width:60px"><button class="btn gray sm" data-rmn="${i}">移除</button></td></tr>`;
+  }).join('')}</tbody></table>` : '<div class="small muted">未设置节点。</div>';
+
+  box.querySelectorAll('[data-rmn]').forEach(b => b.addEventListener('click', () => {
+    NODES.splice(Number(b.dataset.rmn), 1);
+    localStorage.setItem('nodes', JSON.stringify(NODES)); renderNodes();
+  }));
+
+  const upcoming = NODES.map(n => ({ n, d: Math.ceil((new Date(n.date + 'T00:00:00') - now) / 86400000) }))
+    .filter(x => x.d >= 0).sort((a, b) => a.d - b.d)[0];
+  if (upcoming) {
+    document.getElementById('kDeadline').textContent = upcoming.d + ' 天';
+    document.getElementById('kDeadlineNote').textContent = upcoming.n.name + '（' + upcoming.n.date + '）';
+  } else {
+    document.getElementById('kDeadline').textContent = '—';
+    document.getElementById('kDeadlineNote').textContent = '未设置节点';
+  }
+}
+document.getElementById('ndAdd').addEventListener('click', () => {
+  const n = document.getElementById('ndName').value.trim(), d = document.getElementById('ndDate').value;
+  if (!n || !d) { alert('请填写节点名称与日期'); return; }
+  NODES.push({ name: n, date: d });
+  localStorage.setItem('nodes', JSON.stringify(NODES));
+  document.getElementById('ndName').value = ''; document.getElementById('ndDate').value = '';
+  renderNodes();
+});
+
+/* ---------- 机会预警 ---------- */
+async function renderOpp() {
+  const body = document.getElementById('oppBody');
+  body.innerHTML = '<tr><td colspan="6"><div class="empty"><span class="spinner"></span> 筛选中…</div></td></tr>';
+  try {
+    const r = await api.post('/api/search', { profile: P, filters: { tag: oppTag, pos: P.targetPosition }, page: 0, size: 12 });
+    body.innerHTML = r.players.length ? r.players.map(p => `<tr>
+      <td>${playerRow(p)}</td><td class="nowrap small">${esc(p.positionCn)}</td>
+      <td class="num small">${val(p.age)}</td>
+      <td class="small">${esc(p.team || '—')}${p.leagueCn ? '<div class="muted">' + esc(p.leagueCn) + '</div>' : ''}</td>
+      <td>${scoreBar(p.fit.total)}</td>
+      <td><div class="btn-row"><a class="btn ghost sm" href="player.html?id=${esc(p.id)}">档案</a>
+        <button class="btn sm" data-add="${esc(p.id)}" data-name="${esc(p.name)}">加目标</button></div></td>
+    </tr>`).join('') : '<tr><td colspan="6"><div class="empty">暂无符合条件的球员</div></td></tr>';
+    body.querySelectorAll('[data-add]').forEach(b => b.addEventListener('click', async () => {
+      await api.post('/api/targets', { target: { id: b.dataset.add, name: b.dataset.name, level: 'C', stage: '初步接触', note: '来自市场机会预警' } });
+      b.textContent = '已加入';
+    }));
+  } catch (e) { body.innerHTML = '<tr><td colspan="6"><div class="note">' + esc(e.message) + '</div></td></tr>'; }
+}
+$$('#oppSeg button').forEach(b => b.addEventListener('click', () => {
+  $$('#oppSeg button').forEach(x => x.classList.remove('on')); b.classList.add('on'); oppTag = b.dataset.t;
+}));
+document.getElementById('oppGo').addEventListener('click', renderOpp);
+
+/* ---------- 监控 ---------- */
+async function renderMonitor() {
+  const body = document.getElementById('monBody');
+  try {
+    const r = await api.get('/api/targets');
+    const list = r.targets || [];
+    document.getElementById('kTargets').textContent = list.length;
+    document.getElementById('kTargetsNote').textContent = `A ${list.filter(t => t.level === 'A').length} · B ${list.filter(t => t.level === 'B').length} · C ${list.filter(t => t.level === 'C').length}`;
+    body.innerHTML = list.length ? list.map(t => {
+      const p = t.player;
+      return `<tr><td>${p ? playerRow(p) : esc(t.name || t.id)}</td>
+        <td>${esc(t.level || '—')}</td><td class="small">${esc(t.stage || '—')}</td>
+        <td class="small">${p && p.fetchedAt ? new Date(p.fetchedAt).toLocaleString('zh-CN') : '—'}</td>
+        <td><button class="btn gray sm" data-ref="${esc(t.id)}">刷新</button></td></tr>`;
+    }).join('') : '<tr><td colspan="5"><div class="empty">暂无目标</div></td></tr>';
+    body.querySelectorAll('[data-ref]').forEach(b => b.addEventListener('click', async () => {
+      b.textContent = '刷新中…';
+      try {
+        const rr = await api.get('/api/player?id=' + q(b.dataset.ref) + '&refresh=1');
+        b.textContent = '已更新';
+        setTimeout(renderMonitor, 800);
+      } catch (e) { b.textContent = '失败'; }
+    }));
+  } catch (e) { body.innerHTML = '<tr><td colspan="5"><div class="note">' + esc(e.message) + '</div></td></tr>'; }
+}
+
+(async () => {
+  P = await loadProfile();
+  try {
+    const h = await api.get('/api/health');
+    document.getElementById('kPlayers').textContent = h.players.toLocaleString();
+    document.getElementById('kUpdated').textContent = h.indexUpdatedAt
+      ? '索引更新 ' + new Date(h.indexUpdatedAt).toLocaleString('zh-CN') : '尚未建库';
+  } catch (e) { }
+  try {
+    CAT = await api.get('/api/tactics');
+    document.getElementById('gapFormation').innerHTML =
+      Object.keys(CAT.formations).map(k => `<option value="${k}">${esc(CAT.formations[k].cn)}</option>`).join('');
+    document.getElementById('gapStyle').innerHTML =
+      Object.keys(CAT.styles).map(k => `<option value="${k}">${esc(CAT.styles[k].cn)}</option>`).join('');
+    const mc = (await api.get('/api/my-club')).club;
+    if (mc && mc.formation) document.getElementById('gapFormation').value = mc.formation;
+    else if (P.formation && CAT.formations[P.formation]) document.getElementById('gapFormation').value = P.formation;
+    if (mc && mc.style) document.getElementById('gapStyle').value = mc.style;
+    else if (P.style && CAT.styles[P.style]) document.getElementById('gapStyle').value = P.style;
+  } catch (e) { }
+  document.getElementById('gapGo').addEventListener('click', loadGap);
+  loadGap();
+  renderHeat(); renderNodes(); renderBudget(); renderOpp(); renderMonitor();
+})();
+</script>
+</body>
+</html>
