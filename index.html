@@ -1175,7 +1175,7 @@ function renderRosterGroups(kw) {
         <div class="tbl-scroll" id="rBody${gi}">
           <table class="table">
             <thead><tr>
-              <th style="width:44px">号</th><th>球员</th><th>位置</th><th>年龄</th><th>国籍</th>
+              <th style="width:44px">号</th><th style="width:54px">头像</th><th>球员</th><th>位置</th><th>年龄</th><th>国籍</th>
               <th>身高</th><th>出场</th><th>身价</th><th>薪资</th>
             </tr></thead>
             <tbody>${g.list.map(p => {
@@ -1183,8 +1183,14 @@ function renderRosterGroups(kw) {
                 ? `<div style="font-weight:600">${esc(p.nameCn)}</div><div class="small muted">${esc(p.name)}</div>`
                 : `<div style="font-weight:600">${esc(p.name)}</div>`;
               const dqdBadge = p.dqdId ? ' <span class="badge info" style="font-size:10px" title="懂球帝资料可查：中文名/转会/伤病/赛季数据">D</span>' : '';
+              /* 头像：有真实照片显示照片；没有则用姓名首字母占位（不伪造图片） */
+              const ini = String(p.name || '?').trim().split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase();
+              const avatar = p.image
+                ? `<img src="${esc(p.image)}" alt="" loading="lazy" style="width:34px;height:34px;border-radius:50%;object-fit:cover;background:#e8e8ed" onerror="this.style.visibility='hidden'">`
+                : `<span title="数据源暂无该球员照片" style="display:inline-flex;width:34px;height:34px;border-radius:50%;background:#e8e8ed;color:#86868b;font-size:12px;font-weight:600;align-items:center;justify-content:center">${esc(ini)}</span>`;
               return `<tr>
                 <td class="num" style="width:44px">${p.shirtNum != null ? p.shirtNum : '<span class="muted">—</span>'}</td>
+                <td style="width:54px">${avatar}</td>
                 <td><a href="player.html?id=${esc(p.id)}">${display}</a>${p.loan ? ' <span class="badge info">租借</span>' : ''}${dqdBadge}</td>
                 <td class="nowrap">${esc(p.positionCn || '—')}</td>
                 <td class="num">${p.age != null ? p.age : '<span class="muted">—</span>'}</td>
