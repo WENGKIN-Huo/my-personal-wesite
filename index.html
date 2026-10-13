@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>身份与俱乐部 · 球员挖掘系统</title>
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+<div id="nav"></div>
+
+<section class="wrap">
+  <div class="note" style="border-left:3px solid #3ba55c;background:#eefaf2">
+    <b>数据可信度说明</b>：阵容数据来自权威源——英超为 premierleague.com 官方接口、其余四大联赛为 football-data.org
+    （<b>当前 2026/27 赛季，已与各俱乐部官网核对无误</b>，例如 Bruno Guimarães 已确认 2026 年 8 月转会阿森纳 #39）。
+    每位球员来源均已标注，可在球员档案页直达官网核对。
+    身价 / 薪资 / 伤病无任何开放接口，缺失即留空、<b>绝不编造</b>。
+  </div>
+</section>
+
+<section class="wrap section">
+  <div class="eyebrow">第一步</div>
+  <h1>你是哪家俱乐部的<br>转会决策人？</h1>
+  <p class="lede">
+    先选定你效力的俱乐部与你在转会流程中的角色，系统会把这套身份贯穿到
+    战术体系、球员挖掘、转会测算与决策驾驶舱的每一个环节。
+  </p>
+</section>
+
+<!-- ============ 0. 补全完整阵容（可选） ============ -->
+<section class="wrap section tight" id="fdSection">
+  <div class="card">
+    <h3>补全西甲 / 意甲 / 德甲 / 法甲 完整阵容</h3>
+    <p class="small muted mt8">
+      你提供的 football-data.org 免费令牌<b>已验证可用</b>，且经核对返回的是<b>当前 2026/27 真实赛季</b>数据
+      （例如：英超升班马为 Coventry / Hull / Ipswich，降级为 West Ham / Burnley / Wolves；
+      Bruno Guimarães 于 2026 年 8 月转会阿森纳 #39，均与各俱乐部官网一致）。
+      因此<b>四大联赛阵容可直接使用 football-data.org 数据</b>，英超则采用 premierleague.com 官方接口。
+      令牌仅保存在本地，不上传。
+    </p>
+    <div class="row mt16" style="gap:10px;flex-wrap:wrap">
+      <input type="text" id="fdToken" placeholder="粘贴 football-data.org 令牌" style="flex:1;min-width:240px">
+      <button class="btn" id="fdSave">保存并验证</button>
+      <button class="btn ghost" id="fdRun">拉取完整阵容</button>
+      <a class="btn gray" href="https://www.football-data.org/client/register" target="_blank" rel="noopener">获取免费令牌 ↗</a>
+    </div>
+    <div class="small muted mt12" id="fdStatus"></div>
+  </div>
+</section>
+
+<!-- ============ 1. 选联赛 ============ -->
+<section class="wrap section tight">
+  <div class="card">
+    <h3>① 选择联赛</h3>
+    <p class="small muted mt8">下列球队均来自本地真实球员库，括号内为该队已收录的真实在册球员数。</p>
+    <div class="row mt16" id="leagueSeg"></div>
+    <div class="mt16 small muted" id="leagueStat"></div>
+  </div>
+</section>
+
+<!-- ============ 2. 选球队 ============ -->
+<section class="wrap section tight">
+  <div class="card">
+    <h3>② 选择俱乐部</h3>
+    <div class="grid g3 mt16" id="clubGrid"><div class="empty"><span class="spinner"></span> 加载中…</div></div>
+  </div>
+</section>
+
+<!-- ============ 2.5 该队阵容名单 ============ -->
+<section class="wrap section tight" id="rosterSection" style="display:none">
+  <div class="card">
+    <div class="between">
+      <h3>该俱乐部在册阵容名单</h3>
+      <span class="small muted" id="rosterMeta"></span>
+    </div>
+    <div id="rosterSummary" class="mt16"></div>
+    <div class="row mt16" style="gap:8px">
+      <input type="search" id="rosterQ" placeholder="在阵容内搜索（中文名 / 英文名）" style="max-width:300px">
+      <span class="small muted" id="rosterQTip"></span>
+    </div>
+    <div id="rosterBox" class="mt16"></div>
+  </div>
+</section>
+
+<!-- ============ 3. 转会决策角色 ============ -->
+<section class="wrap section tight">
+  <div class="card">
+    <h3>③ 我在转会流程中的角色</h3>
+    <p class="small muted mt8">这是足球行业真实存在的转会决策分工。不同角色在本系统中的关注点与权限不同。</p>
+    <div class="grid g3 mt16" id="roleGrid"></div>
+  </div>
+</section>
+
+<!-- ============ 4. 负责人信息 ============ -->
+<section class="wrap section tight">
+  <div class="card">
+    <div class="between">
+      <h3>④ 转会负责人</h3>
+      <span class="small muted" id="offTeam"></span>
+    </div>
+    <div id="offBox" class="mt16"><div class="small muted">请先选择俱乐部</div></div>
+
+    <div class="note gray mt16">
+      <b>关于负责人姓名，系统为什么不预填？</b><br>
+      公开数据源（TheSportsDB / football-data / API-Football）均不含"体育总监"字段，已实测确认；
+      该岗位人员流动又极频繁（英超总监平均任期不足两年）。
+      写死一份名单会在数月内变成不可核验的过期信息 —— 那等同于造假。
+      因此系统采取：<b>公开报道快照（附出处与核查日期）</b> + <b>本人登记</b> 两层结构。
+    </div>
+  </div>
+</section>
+
+<!-- ============ 5. 确认 ============ -->
+<section class="wrap section tight">
+  <div class="card">
+    <h3>⑤ 确认身份并开始</h3>
+    <div class="grid g2 mt16">
+      <div class="field"><label>你的姓名（本人登记，仅本地保存）</label><input type="text" id="myName" placeholder="例如：张三"></div>
+      <div class="field"><label>联系方式（可选）</label><input type="text" id="myContact" placeholder="邮箱 / 电话，可不填"></div>
+    </div>
+    <div class="btn-row mt24">
+      <button class="btn" id="saveBtn">保存身份并载入该队真实阵容</button>
+      <a class="btn ghost" href="tactical.html">先去配置战术体系</a>
+      <span class="small muted" id="saveTip"></span>
+    </div>
+    <div id="pickSummary" class="mt16"></div>
+  </div>
+</section>
+
+<div id="foot"></div>
+<script src="assets/js/common.js"></script>
+<script>
+renderNav('index.html');
+
+let LEAGUES = [], ROLES = [], curLeague = null, curClub = null, curRole = null, OFF = null;
+const pre = new URLSearchParams(location.search).get('team');   // ?team= 直达参数（提升作用域）
+
+(async function init() {
+  try { ROLES = (await api.get('/api/roles')).roles; } catch (e) { ROLES = []; }
+  renderRoles();
+  try {
+    const r = await api.get('/api/top-clubs');
+    LEAGUES = r.leagues.filter(l => l.teamCount > 0);
+    curLeague = LEAGUES[0] ? LEAGUES[0].league : null;
+    /* 支持 ?team=Arsenal 直达：自动定位联赛并展开该队阵容 */
+    /* 模糊匹配队名：参数可能是短名（Arsenal），列表里是全名（Arsenal FC）。
+       规范化（去重音/小写）后按「相等 / 前缀 / 包含」三级匹配。 */
+    const normT = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim();
+    const findTeam = (teams, kw) => {
+      const k = normT(kw);
+      if (!k) return null;
+      return teams.find(t => normT(t.name) === k) ||
+        teams.find(t => normT(t.name).startsWith(k + ' ')) ||
+        teams.find(t => normT(t.name).includes(k));
+    };
+    if (pre) {
+      const hit = LEAGUES.find(l => findTeam(l.teams, pre));
+      if (hit) curLeague = hit.league;
+    }
+    renderLeagueSeg(); renderClubs();
+    if (pre) {
+      const l = LEAGUES.find(x => x.league === curLeague);
+      const team = l ? findTeam(l.teams, pre) : null;
+      if (team) {
+        const el = document.querySelector('.club-item[data-name="' + CSS.escape(team.name) + '"]');
+        if (el) el.click();
+      }
+    }
+  } catch (e) {
+    document.getElementById('clubGrid').innerHTML = '<div class="note">' + esc(e.message) + '</div>';
+  }
+  /* 恢复已保存的身份（显式 ?team= 直达参数优先，不被覆盖） */
+  if (!pre) {
+    try {
+      const c = (await api.get('/api/my-club')).club;
+      if (c && c.teamId) { curClub = { name: c.teamName, id: c.teamId, players: c.squadSize }; renderOff(); renderSummary(); await loadClubOfficials(); renderRoles(); }
+    } catch (e) { }
+  }
+  const P = await loadProfile();
+  if (P.identity) {
+    curRole = P.identity.roleKey;
+    document.getElementById('myName').value = P.identity.name || '';
+    document.getElementById('myContact').value = P.identity.contact || '';
+    renderRoles();
+  }
+  initFdPanel();
+})();
+
+function renderLeagueSeg() {
+  document.getElementById('leagueSeg').innerHTML =
+    LEAGUES.map(l => `<div class="seg"><button data-lg="${esc(l.league)}" class="${l.league === curLeague ? 'on' : ''}">
+      ${esc(l.leagueCn)} <span class="muted">${l.teamCount}</span></button></div>`).join('');
+  document.getElementById('leagueSeg').querySelectorAll('[data-lg]').forEach(b =>
+    b.addEventListener('click', () => { curLeague = b.dataset.lg; renderLeagueSeg(); renderClubs(); }));
+  const l = LEAGUES.find(x => x.league === curLeague);
+  document.getElementById('leagueStat').textContent = l
+    ? `${l.league} · ${l.country} · 第 ${l.tier} 档联赛 · 已收录 ${l.teamCount} 家俱乐部`
+    : '';
+}
+
+function renderClubs() {
+  const l = LEAGUES.find(x => x.league === curLeague);
+  const box = document.getElementById('clubGrid');
+  if (!l) { box.innerHTML = '<div class="small muted">该联赛暂无已收录球队</div>'; return; }
+  box.innerHTML = l.teams.map(t => {
+    const warn = t.leagueMatchesSeed ? '' :
+      `<div class="small" style="color:var(--orange)">数据源标注：${esc(t.leagueCn || t.league || '—')}</div>`;
+    return `
+    <div class="club-item" data-name="${esc(t.name)}" data-id="${esc(t.id)}" data-players="${t.players}">
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:600;font-size:14px">${esc(t.name)}</div>
+        <div class="small muted">真实在册 ${t.players} 人</div>
+        ${warn}
+      </div>
+    </div>`;
+  }).join('');
+  box.querySelectorAll('.club-item').forEach(el => el.addEventListener('click', async () => {
+    box.querySelectorAll('.club-item').forEach(x => x.classList.remove('on'));
+    el.classList.add('on');
+    curClub = { name: el.dataset.name, id: el.dataset.id, players: Number(el.dataset.players) };
+    renderOff(); renderSummary(); renderRoster();
+    await loadClubOfficials();
+    renderRoles();
+  }));
+}
+
+/* ---------- 该队完整阵容名单（按位置分组 + 中文名 + 可搜索） ---------- */
+let ROSTER_DATA = null;   // 阵容原始数据缓存，供搜索过滤复用
+
+const ROSTER_GROUP = [
+  ['GK', '门将', ['GK'], 'ok'],
+  ['DF', '后卫', ['CB', 'LB', 'RB'], 'info'],
+  ['MF', '中场', ['DM', 'CM', 'AM'], 'warn'],
+  ['FW', '前锋', ['LW', 'RW', 'SS', 'ST'], 'err'],
+  ['UNK', '位置未知', ['UNK'], 'gray']
+];
+const POS_GROUP_OF = { GK: 'GK', CB: 'DF', LB: 'DF', RB: 'DF', DM: 'MF', CM: 'MF', AM: 'MF', LW: 'FW', RW: 'FW', SS: 'FW', ST: 'FW' };
+function groupOf(p) {
+  const g = POS_GROUP_OF[p.position];
+  if (g) return g;
+  const cn = p.positionCn || '';
+  if (/门|守/.test(cn)) return 'GK';
+  if (/卫/.test(cn)) return 'DF';
+  if (/中场/.test(cn)) return 'MF';
+  if (/锋/.test(cn)) return 'FW';
+  return 'UNK';
+}
+
+async function renderRoster() {
+  const sec = document.getElementById('rosterSection');
+  const box = document.getElementById('rosterBox');
+  const meta = document.getElementById('rosterMeta');
+  if (!curClub) { sec.style.display = 'none'; return; }
+  sec.style.display = '';
+  box.innerHTML = '<div class="small muted"><span class="spinner"></span> 读取在册名单…</div>';
+  meta.textContent = '';
+  try {
+    const r = await api.get('/api/roster?teamName=' + encodeURIComponent(curClub.name) +
+      (curClub.id ? '&teamId=' + encodeURIComponent(curClub.id) : ''));
+    ROSTER_DATA = r;
+    meta.innerHTML = `共 <b>${r.total}</b> 人` +
+      (r.rosterFull ? ' <span class="badge ok">完整名单</span>' : ' <span class="badge warn">部分名单</span>') +
+      (r.source ? ` <span class="small muted">来源 ${esc(r.source)}</span>` : '') +
+      (r.season ? ` <span class="small muted">${esc(r.season)}</span>` : '');
+    renderRosterSummary(r);
+    renderRosterGroups('');
+  } catch (e) {
+    ROSTER_DATA = null;
+    document.getElementById('rosterSummary').innerHTML = '';
+    box.innerHTML = '<div class="note">' + esc(e.message) + '</div>';
+  }
+}
+
+/* 阵容概况：各位置人数、平均年龄、关键字段覆盖度 */
+function renderRosterSummary(r) {
+  const ages = r.players.map(p => p.age).filter(a => a != null);
+  const avgAge = ages.length ? (ages.reduce((a, b) => a + b, 0) / ages.length).toFixed(1) : null;
+  const byGroup = {};
+  for (const p of r.players) byGroup[groupOf(p)] = (byGroup[groupOf(p)] || 0) + 1;
+  const chips = ROSTER_GROUP.filter(([k]) => byGroup[k])
+    .map(([k, label, , cls]) => `<span class="badge ${cls === 'gray' ? '' : cls}">${label} ${byGroup[k]} 人</span>`).join(' ');
+  const cov = (r.availability || []).filter(a => a.available !== false)
+    .map(a => `${esc(a.label)} ${a.covered}/${a.total}`).join('　');
+  document.getElementById('rosterSummary').innerHTML = `
+    <div class="row" style="gap:8px">${chips}
+      ${avgAge ? `<span class="badge">平均年龄 ${avgAge} 岁</span>` : ''}
+      <span class="badge">${r.players.filter(p => p.nameCn).length} 人含中文译名</span>
+    </div>
+    ${cov ? `<div class="small muted mt8">字段覆盖：${cov}　·　身价/薪资/伤病无开放接口，统一留空不填充</div>` : ''}`;
+}
+
+/* 按位置分组渲染（kw 为搜索词，空串则全部显示） */
+function renderRosterGroups(kw) {
+  const box = document.getElementById('rosterBox');
+  const r = ROSTER_DATA;
+  if (!r) return;
+  const k = String(kw || '').toLowerCase().trim();
+  const match = p => !k ||
+    String(p.name || '').toLowerCase().includes(k) ||
+    String(p.nameCn || '').toLowerCase().includes(k) ||
+    String(p.nationality || '').toLowerCase().includes(k);
+
+  const groups = ROSTER_GROUP.map(([key, label, poss, cls]) => {
+    const list = r.players.filter(p => groupOf(p) === key && match(p));
+    return { key, label, cls, list };
+  }).filter(g => g.list.length);
+
+  document.getElementById('rosterQTip').textContent = k ? `「${kw}」匹配 ${groups.reduce((n, g) => n + g.list.length, 0)} 人` : '';
+
+  if (!groups.length) {
+    box.innerHTML = `<div class="empty"><h3>无匹配球员</h3><p class="small muted">试试其他中文名 / 英文名 / 国籍</p></div>`;
+  } else {
+    box.innerHTML = groups.map((g, gi) => `
+      <div class="roster-group" data-gi="${gi}">
+        <div class="roster-group-head" data-gi="${gi}">
+          <span class="badge ${g.cls === 'gray' ? '' : g.cls}" style="font-size:12.5px">${g.label}</span>
+          <span class="small muted">${g.list.length} 人</span>
+          <span class="roster-arrow" id="rArrow${gi}">▾</span>
+        </div>
+        <div class="tbl-scroll" id="rBody${gi}">
+          <table class="table">
+            <thead><tr>
+              <th style="width:44px">号</th><th>球员</th><th>位置</th><th>年龄</th><th>国籍</th>
+              <th>身高</th><th>出场</th><th>身价</th><th>薪资</th>
+            </tr></thead>
+            <tbody>${g.list.map(p => {
+              const display = p.nameCn
+                ? `<div style="font-weight:600">${esc(p.nameCn)}</div><div class="small muted">${esc(p.name)}</div>`
+                : `<div style="font-weight:600">${esc(p.name)}</div>`;
+              const dqdBadge = p.dqdId ? ' <span class="badge info" style="font-size:10px" title="懂球帝资料可查：中文名/转会/伤病/赛季数据">D</span>' : '';
+              return `<tr>
+                <td class="num" style="width:44px">${p.shirtNum != null ? p.shirtNum : '<span class="muted">—</span>'}</td>
+                <td><a href="player.html?id=${esc(p.id)}">${display}</a>${p.loan ? ' <span class="badge info">租借</span>' : ''}${dqdBadge}</td>
+                <td class="nowrap">${esc(p.positionCn || '—')}</td>
+                <td class="num">${p.age != null ? p.age : '<span class="muted">—</span>'}</td>
+                <td>${esc(p.nationality || '—')}</td>
+                <td class="num">${p.height != null ? p.height + '<span class="muted small">cm</span>' : '<span class="muted">—</span>'}</td>
+                <td class="num">${p.appearances != null ? p.appearances : '<span class="muted">—</span>'}</td>
+                <td>${p.marketValue != null ? esc(p.marketValue) : '<span class="muted small">暂无数据</span>'}</td>
+                <td>${p.wage != null ? esc(p.wage) : '<span class="muted small">暂无数据</span>'}</td>
+              </tr>`;
+            }).join('')}</tbody>
+          </table>
+        </div>
+      </div>`).join('');
+    box.querySelectorAll('.roster-group-head').forEach(h =>
+      h.addEventListener('click', () => {
+        const gi = h.dataset.gi;
+        const b = document.getElementById('rBody' + gi);
+        const a = document.getElementById('rArrow' + gi);
+        const hide = b.style.display === 'none';
+        b.style.display = hide ? '' : 'none';
+        a.textContent = hide ? '▾' : '▸';
+      }));
+  }
+  box.innerHTML += `<div class="note gray mt16">
+    <b>关于身价 / 薪资 / 伤病 / 赛季统计</b><br>
+    这四类数据没有通用开放数据接口。系统对拿不到的字段一律显示「暂无数据」，<b>不做任何估算填充</b>。
+    名字旁带 <span class="badge info" style="font-size:10px">D</span> 标记的球员（已核实懂球帝 ID），
+    其球员档案页可直接查看懂球帝的真实<b>伤病记录 / 每赛季数据 / 转会记录 / 身价合同</b>。
+  </div>`;
+}
+
+document.getElementById('rosterQ').addEventListener('input', e => renderRosterGroups(e.target.value));
+
+/* ---------- ③ 转会决策角色：显示该俱乐部各角色的现任负责人 ---------- */
+let CLUB_OFF = null, CLUB_OFF_TEAM = null;
+async function loadClubOfficials() {
+  if (!curClub) { CLUB_OFF = null; CLUB_OFF_TEAM = null; return; }
+  if (CLUB_OFF_TEAM === curClub.name && CLUB_OFF) return;
+  CLUB_OFF_TEAM = curClub.name;
+  try { CLUB_OFF = (await api.get('/api/officials?team=' + encodeURIComponent(curClub.name))).info; }
+  catch (e) { CLUB_OFF = null; }
+}
+
+function statusBadge(status) {
+  const m = { official: ['ok', '官方来源'], reported: ['info', '媒体报道'], unconfirmed: ['warn', '待确认'] };
+  const s = m[status] || m.reported;
+  return `<span class="badge ${s[0]}">${s[1]}</span>`;
+}
+
+function rolePersonBlock(r) {
+  if (!curClub) return `<div class="small muted mt12" style="border-top:1px solid var(--line-soft);padding-top:10px">② 选择俱乐部后，这里显示该队现任${esc(r.cn)}</div>`;
+  const off = CLUB_OFF && CLUB_OFF.byRole ? CLUB_OFF.byRole[r.key] : null;
+  if (off && off.name) {
+    return `<div class="mt12" style="border-top:1px solid var(--line-soft);padding-top:10px">
+      <div class="small muted">现任 · ${esc(CLUB_OFF.clubKey || curClub.name)}</div>
+      <div style="font-weight:600;font-size:14.5px" class="mt8">${off.cn ? esc(off.cn) : esc(off.name)}</div>
+      ${off.cn ? `<div class="small muted">${esc(off.name)}</div>` : ''}
+      <div class="small muted mt8">任职 ${esc(off.since || '—')}</div>
+      <div class="row mt8" style="gap:6px">
+        ${statusBadge(off.status)}
+        ${off.url ? `<a class="btn ghost sm" href="${esc(off.url)}" target="_blank" rel="noopener" title="${esc(off.source || '')}">来源 ↗</a>` : ''}
+      </div>
+    </div>`;
+  }
+  const tm = CLUB_OFF && CLUB_OFF.checkLinks && CLUB_OFF.checkLinks[0];
+  return `<div class="mt12" style="border-top:1px solid var(--line-soft);padding-top:10px">
+    <div class="small muted">现任 · ${esc(curClub.name)}</div>
+    <div class="small mt8 muted">该俱乐部${esc(r.cn)}负责人<b>未公开披露</b>，系统不做猜测。</div>
+    ${tm ? `<a class="btn ghost sm mt8" href="${esc(tm.url)}" target="_blank" rel="noopener">Transfermarkt 管理层页核对 ↗</a>` : ''}
+  </div>`;
+}
+
+function renderRoles() {
+  document.getElementById('roleGrid').innerHTML = ROLES.map(r => `
+    <div class="card flat role-card" data-role="${esc(r.key)}" style="cursor:pointer;padding:16px;${curRole === r.key ? 'border-color:var(--blue);background:var(--blue-soft)' : ''}">
+      <div style="font-weight:600;font-size:15px">${esc(r.cn)}</div>
+      <div class="small muted mt8">${esc(r.en)}</div>
+      <div class="small mt8">${esc(r.duty)}</div>
+      ${rolePersonBlock(r)}
+    </div>`).join('');
+  document.getElementById('roleGrid').querySelectorAll('[data-role]').forEach(el =>
+    el.addEventListener('click', () => { curRole = el.dataset.role; renderRoles(); renderSummary(); }));
+}
+
+async function renderOff() {
+  const box = document.getElementById('offBox');
+  document.getElementById('offTeam').textContent = curClub ? curClub.name : '';
+  if (!curClub) { box.innerHTML = '<div class="small muted">请先选择俱乐部</div>'; return; }
+  box.innerHTML = '<div class="small muted"><span class="spinner"></span> 查询负责人信息…</div>';
+  try {
+    OFF = (await api.get('/api/officials?team=' + encodeURIComponent(curClub.name))).info;
+    let html = '';
+
+    if (OFF.registered) {
+      html += `<div class="note blue"><b>本人登记</b>：${esc(OFF.registered.name || '—')}
+        <div class="mt8 small">${esc(OFF.registered.roleCn || '—')}
+        ${OFF.registered.contact ? ' · ' + esc(OFF.registered.contact) : ''}
+        · 登记于 ${esc((OFF.registered.registeredAt || '').replace('T', ' ').slice(0, 19))}</div></div>`;
+    }
+
+    /* 该俱乐部现任核心岗位（主教练 / 体育总监，来自分角色名录，附来源） */
+    if (OFF.byRole) {
+      const rows = [['主教练', OFF.byRole.head_coach], ['体育总监', OFF.byRole.sporting_director]]
+        .filter(([, v]) => v && v.name);
+      if (rows.length) {
+        html += `<div class="card flat mt12"><div class="small muted">该俱乐部现任核心岗位（核查于 ${esc(OFF.verifiedAt || '—')}）</div>` +
+          rows.map(([label, v]) => `
+            <div class="between mt8">
+              <div>
+                <span class="badge info">${label}</span>
+                <b style="margin-left:6px">${esc(v.cn || v.name)}</b>
+                ${v.cn ? `<span class="small muted" style="margin-left:6px">${esc(v.name)}</span>` : ''}
+                <div class="small muted mt8">任职 ${esc(v.since || '—')} · ${esc(v.source || '')}</div>
+              </div>
+              ${statusBadge(v.status)}
+            </div>`).join('') + `</div>`;
+      }
+    }
+
+    if (OFF.reference && OFF.reference.length) {
+      html += OFF.reference.map(o => {
+        const cls = o.status === 'official' ? 'ok' : o.status === 'unconfirmed' ? 'warn' : 'info';
+        const txt = o.status === 'official' ? '官方来源' : o.status === 'unconfirmed' ? '未证实传闻' : '媒体报道';
+        return `<div class="card flat mt12">
+          <div class="between">
+            <div style="font-weight:600;font-size:15px">${esc(o.name)}</div>
+            <span class="badge ${cls}">${txt}</span>
+          </div>
+          <div class="small muted mt8">${esc(o.role)}　·　${esc(o.since)}</div>
+          <div class="small muted mt8">来源：${esc(o.source)}</div>
+          <div class="row mt8">
+            <a class="btn ghost sm" href="${esc(o.url)}" target="_blank" rel="noopener">打开来源核对</a>
+            <span class="small muted">核查日期 ${esc(OFF.verifiedAt)}</span>
+          </div>
+        </div>`;
+      }).join('');
+      html += `<div class="note mt12">以上为公开报道快照，核查于 <b>${esc(OFF.verifiedAt)}</b>。
+        该岗位人员变动频繁，使用前请点击来源链接核对；如已变动，可在下方登记现任负责人。</div>`;
+    } else {
+      html += `<div class="note gray mt8"><b>未登记</b>：公开渠道未检索到该俱乐部可核验的负责人信息。
+        系统不会猜测填充。你可在下方「本人登记」中填写，或点击右侧链接自行核对后补充。</div>`;
+    }
+
+    html += `<div class="row mt16">${OFF.checkLinks.map(c =>
+      `<a class="btn gray sm" href="${esc(c.url)}" target="_blank" rel="noopener">${esc(c.label)} ↗</a>`).join('')}</div>`;
+    box.innerHTML = html;
+  } catch (e) { box.innerHTML = '<div class="note">' + esc(e.message) + '</div>'; }
+}
+
+function renderSummary() {
+  const el = document.getElementById('pickSummary');
+  const role = ROLES.find(r => r.key === curRole);
+  el.innerHTML = `<div class="note gray">
+    <b>当前选择</b>：${curClub ? esc(curClub.name) : '未选俱乐部'}
+    ${role ? '　·　' + esc(role.cn) : '　·　未选角色'}
+    ${curClub ? `　·　真实在册 ${curClub.players} 人` : ''}
+  </div>`;
+}
+
+document.getElementById('saveBtn').addEventListener('click', async () => {
+  const tip = document.getElementById('saveTip');
+  if (!curClub) { tip.textContent = '请先选择俱乐部'; return; }
+  tip.innerHTML = '<span class="spinner"></span> 正在载入真实阵容…';
+  try {
+    /* 1) 登记负责人身份 */
+    const role = ROLES.find(r => r.key === curRole);
+    const name = document.getElementById('myName').value.trim();
+    if (name) {
+      await api.post('/api/officials', {
+        team: curClub.name, name, roleKey: curRole || null,
+        roleCn: role ? role.cn : null, contact: document.getElementById('myContact').value.trim()
+      });
+      const P = await loadProfile();
+      P.identity = { name, roleKey: curRole, roleCn: role ? role.cn : null, team: curClub.name };
+      saveProfile(P);
+    }
+    /* 2) 载入该队真实阵容为"我的球队" */
+    const t = LEAGUES.find(x => x.league === curLeague);
+    const r = await api.post('/api/my-club', {
+      teamId: curClub.id, teamName: curClub.name,
+      league: t ? t.league : null, leagueId: null
+    });
+    tip.textContent = `已载入 ${r.added} 名真实在册球员` + (r.cached ? '（本地缓存）' : '（实时拉取）');
+    renderOff(); renderSummary();
+    setTimeout(() => { location.href = 'tactical.html'; }, 1200);
+  } catch (e) { tip.textContent = '保存失败：' + e.message; }
+});
+
+/* ---------- 四大联赛完整阵容补全（football-data.org 免费令牌） ---------- */
+async function initFdPanel() {
+  const status = document.getElementById('fdStatus');
+  const tokenInput = document.getElementById('fdToken');
+  try {
+    const s = await api.get('/api/ingest/fd/status');
+    if (s.running) status.innerHTML = '<span class="spinner"></span> 正在后台补全四大联赛阵容…';
+    else if (s.lastRunAt) status.textContent = '上次补全：' + new Date(s.lastRunAt).toLocaleString('zh-CN') +
+      (s.lastResult ? '（' + (s.lastResult.teams || 0) + ' 队 / ' + (s.lastResult.players || 0) + ' 人）' : '');
+  } catch (e) { }
+  document.getElementById('fdSave').addEventListener('click', async () => {
+    const t = tokenInput.value.trim();
+    if (!t) { status.textContent = '请先粘贴令牌'; return; }
+    status.innerHTML = '<span class="spinner"></span> 正在保存并验证令牌…';
+    try {
+      const r = await api.post('/api/config/token', { token: t });
+      if (r.valid) { status.innerHTML = '✓ 令牌有效（可拉取 ' + r.teams + ' 支英超球队），点击「拉取完整阵容」开始'; tokenInput.value = ''; }
+      else status.textContent = '令牌验证未通过：' + (r.error || '未知') + '，请检查后重试';
+    } catch (e) { status.textContent = '保存失败：' + e.message; }
+  });
+  document.getElementById('fdRun').addEventListener('click', async () => {
+    status.innerHTML = '<span class="spinner"></span> 已在后台启动，约 8~12 分钟，可刷新本页查看进度';
+    try {
+      const r = await api.post('/api/ingest/fd', {});
+      status.textContent = r.note || '已启动';
+      pollFd();
+    } catch (e) { status.textContent = '启动失败：' + e.message; }
+  });
+}
+function pollFd() {
+  const status = document.getElementById('fdStatus');
+  const iv = setInterval(async () => {
+    try {
+      const s = await api.get('/api/ingest/fd/status');
+      if (s.running) { status.innerHTML = '<span class="spinner"></span> 正在后台补全四大联赛阵容…'; return; }
+      clearInterval(iv);
+      if (s.lastResult) status.innerHTML = '✓ 补全完成：' + (s.lastResult.teams || 0) + ' 队 / ' + (s.lastResult.players || 0) + ' 人，正在刷新…';
+      else status.textContent = '补全结束';
+      if (location.pathname.endsWith('identity.html')) setTimeout(() => location.reload(), 1500);
+    } catch (e) { }
+  }, 15000);
+}
+</script>
+</body>
+</html>
